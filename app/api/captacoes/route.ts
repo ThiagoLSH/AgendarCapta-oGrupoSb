@@ -4,6 +4,7 @@ import { buildTaskName } from "@/lib/naming";
 import { Marca, MARCAS, SUBMARCAS_BY_MARCA, pontosFromDuracaoHoras } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 interface CreateCaptacaoBody {
   titulo: string;

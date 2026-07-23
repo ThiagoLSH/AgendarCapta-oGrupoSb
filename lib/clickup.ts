@@ -101,11 +101,23 @@ export interface ListCaptacaoTasksOptions {
   dueDateLessThan?: number;
 }
 
-/** Lista tasks da lista House Quatro5 cujo nome contenha "captação" (case-insensitive). */
+/**
+ * Lista tasks da lista House Quatro5 marcadas como captação.
+ * Filtra direto na API do ClickUp pelo campo "Tarefas SKILL" = Captação, em vez de
+ * paginar a lista inteira (compartilhada com todo o time de marketing, milhares de
+ * tasks históricas) e filtrar no cliente — isso é o que fazia o scan levar ~1min e
+ * estourar o timeout das funções serverless na Vercel.
+ */
 export async function listCaptacaoTasks(options: ListCaptacaoTasksOptions = {}): Promise<ClickUpTask[]> {
   const params = new URLSearchParams();
   params.set("include_closed", "true");
   params.set("subtasks", "true");
+  params.set(
+    "custom_fields",
+    JSON.stringify([
+      { field_id: CUSTOM_FIELDS.tarefasSkill, operator: "ANY", value: [FIXED_FIELD_VALUES.tarefasSkillCaptacao] },
+    ])
+  );
   if (options.dueDateGreaterThan) params.set("due_date_gt", String(options.dueDateGreaterThan));
   if (options.dueDateLessThan) params.set("due_date_lt", String(options.dueDateLessThan));
 
@@ -122,7 +134,7 @@ export async function listCaptacaoTasks(options: ListCaptacaoTasksOptions = {}):
     page += 1;
   }
 
-  return allTasks.filter((task) => /capta[cç][aã]o/i.test(task.name));
+  return allTasks;
 }
 
 /** Atualiza a descrição de uma task (usado para gravar o marcador de sincronização). */

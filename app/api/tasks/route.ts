@@ -3,6 +3,7 @@ import { getCustomFieldValue, listCaptacaoTasks } from "@/lib/clickup";
 import { CUSTOM_FIELDS, SUBMARCAS_BY_MARCA, Marca } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const UUID_TO_MARCA: Record<string, Marca> = Object.fromEntries(
   (Object.entries(SUBMARCAS_BY_MARCA) as [Marca, { label: string; uuid: string }[]][]).flatMap(
