@@ -8,6 +8,36 @@ function alreadySynced(task: ClickUpTask): boolean {
   return description.includes(GOOGLE_CALENDAR.syncedMarkerPrefix);
 }
 
+/**
+ * Cria o evento no Google Calendar dedicado pra uma task e grava o marcador de
+ * sincronização na descrição. Usada tanto pela criação de captação (sync imediato)
+ * quanto pelo cron periódico (sync das que passaram batidas, ex: geradas fora do site).
+ * Retorna null se a task não tem due_date (não dá pra posicionar no calendário) ou já
+ * estava sincronizada.
+ */
+export async function syncSingleTask(task: ClickUpTask): Promise<{ eventId: string } | null> {
+  if (alreadySynced(task)) return null;
+
+  const window = resolveEventWindow(task);
+  if (!window) return null;
+
+  const marca = marcaFromTask(task);
+  const eventId = await createCaptacaoEvent({
+    summary: task.name,
+    description: task.url,
+    startIso: window.start.toISOString(),
+    endIso: window.end.toISOString(),
+    colorId: marca ? GCAL_COLOR_BY_MARCA[marca] : undefined,
+  });
+
+  const existingDescription = task.description ?? task.text_content ?? "";
+  const marker = `${GOOGLE_CALENDAR.syncedMarkerPrefix} (event: ${eventId})`;
+  const newDescription = existingDescription ? `${existingDescription}\n\n${marker}` : marker;
+
+  await updateTaskDescription(task.id, newDescription);
+  return { eventId };
+}
+
 export interface SyncResult {
   scanned: number;
   created: number;
@@ -33,30 +63,14 @@ export async function syncCaptacoesToGoogleCalendar(): Promise<SyncResult> {
       continue;
     }
 
-    const window = resolveEventWindow(task);
-    if (!window) {
+    if (!resolveEventWindow(task)) {
       result.skippedNoDueDate += 1;
       continue;
     }
 
     try {
-      const marca = marcaFromTask(task);
-      const eventId = await createCaptacaoEvent({
-        summary: task.name,
-        description: task.url,
-        startIso: window.start.toISOString(),
-        endIso: window.end.toISOString(),
-        colorId: marca ? GCAL_COLOR_BY_MARCA[marca] : undefined,
-      });
-
-      const existingDescription = task.description ?? task.text_content ?? "";
-      const marker = `${GOOGLE_CALENDAR.syncedMarkerPrefix} (event: ${eventId})`;
-      const newDescription = existingDescription
-        ? `${existingDescription}\n\n${marker}`
-        : marker;
-
-      await updateTaskDescription(task.id, newDescription);
-      result.created += 1;
+      const synced = await syncSingleTask(task);
+      if (synced) result.created += 1;
     } catch (err) {
       result.errors.push({
         taskId: task.id,

@@ -97,7 +97,11 @@ export default function NovaCaptacaoPage() {
       if (body.precisaConfirmarPontuacao) {
         message += " Duração acima de 4h — confirme a pontuação com a Maria Clara.";
       }
-      setResult({ type: "success", message });
+      const resultType = body.calendarSyncError ? "error" : "success";
+      if (body.calendarSyncError) {
+        message += ` Task criada no ClickUp, mas o evento no Google Calendar falhou (${body.calendarSyncError}) — o próximo sync automático tenta de novo.`;
+      }
+      setResult({ type: resultType, message });
       setTitulo("");
       setLocal("");
     } catch (err) {

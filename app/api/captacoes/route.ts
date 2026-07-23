@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createCaptacaoTask } from "@/lib/clickup";
 import { buildTaskName } from "@/lib/naming";
 import { Marca, MARCAS, SUBMARCAS_BY_MARCA, pontosFromDuracaoHoras } from "@/lib/config";
+import { syncSingleTask } from "@/lib/sync";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -73,10 +74,20 @@ export async function POST(req: NextRequest) {
       priority: body.prioridade,
     });
 
+    let calendarSyncError: string | null = null;
+    try {
+      await syncSingleTask(task);
+    } catch (err) {
+      // A task no ClickUp já foi criada com sucesso — um erro aqui não deve derrubar
+      // a resposta, só avisar. O cron periódico tenta de novo depois.
+      calendarSyncError = err instanceof Error ? err.message : String(err);
+    }
+
     return NextResponse.json({
       task: { id: task.id, name: task.name, url: task.url },
       pontos,
       precisaConfirmarPontuacao: precisaConfirmar,
+      calendarSyncError,
     });
   } catch (err) {
     return NextResponse.json(
