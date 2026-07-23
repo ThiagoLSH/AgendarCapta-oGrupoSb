@@ -24,7 +24,7 @@ function LoginForm() {
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? "Erro ao entrar");
 
-      const next = searchParams.get("next") || "/";
+      const next = searchParams.get("next") || "/calendario";
       router.push(next);
       router.refresh();
     } catch (err) {

@@ -22,8 +22,8 @@ export default function Header() {
       <h1>Agenda de Captação — Grupo SB</h1>
       {!isLoginPage && (
         <nav>
-          {isManager && <a href="/">Calendário</a>}
-          <a href="/nova-captacao">Nova captação</a>
+          <a href="/">Nova captação</a>
+          <a href="/calendario">Calendário</a>
           {isManager && <LogoutButton />}
         </nav>
       )}

@@ -15,14 +15,18 @@ ClickUp (comercial, sócios) via link público.
   calendário dedicado. Nunca toca no calendário pessoal do Thiago.
 - `lib/sync.ts` — lógica de sincronização: varre a lista, ignora tasks já marcadas com
   "Sincronizado no Google Agenda" na descrição, cria o evento e grava o marcador.
-- `app/page.tsx` — calendário mensal colorido por marca. Protegido por senha de gestor.
-- `app/nova-captacao/page.tsx` — formulário de criação de captação. Aberto pra qualquer
-  um com o link (sem senha) — só pede o nome da pessoa antes, pra preencher o campo
-  "Solicitante" (guardado no navegador via `localStorage`, não precisa digitar de novo).
+- `app/page.tsx` (rota `/`) — formulário de criação de captação, página inicial do site.
+  Aberto pra qualquer um com o link (sem senha) — só pede o nome da pessoa antes, pra
+  preencher o campo "Solicitante" (guardado no navegador via `localStorage`, não precisa
+  digitar de novo).
+- `app/calendario/page.tsx` (rota `/calendario`) — calendário mensal colorido por marca.
+  Protegido por senha de gestor — só pede a senha quando alguém clica em "Calendário".
+- `app/nova-captacao/page.tsx` — redirect pra `/`, mantido só por compatibilidade com
+  links antigos já compartilhados.
 - `app/login/page.tsx` — tela de login (senha compartilhada, sem cadastro) só pra ver o
   calendário geral.
-- `middleware.ts` — protege só `/` (calendário) e `/api/tasks` (dados do calendário).
-  Sem sessão válida, redireciona para `/login` ou responde 401. Tudo o mais (marcar
+- `middleware.ts` — protege só `/calendario` e `/api/tasks` (dados do calendário). Sem
+  sessão válida, redireciona para `/login` ou responde 401. Tudo o mais (marcar
   captação, `/api/sync`) fica aberto.
 - `lib/auth.ts` — gera/valida o cookie de sessão (hash da senha compartilhada, nunca a
   senha em texto puro).

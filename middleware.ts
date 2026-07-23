@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { isValidSession, SESSION_COOKIE_NAME } from "@/lib/auth";
 
 // Só a visualização do calendário geral exige a senha de gestor — marcar uma captação
-// (/nova-captacao e /api/captacoes) fica aberto pra qualquer um, sem senha nenhuma.
-const PROTECTED_PATHS = ["/", "/api/tasks"];
+// (a página inicial "/" e /api/captacoes) fica aberto pra qualquer um, sem senha nenhuma.
+const PROTECTED_PATHS = ["/calendario", "/api/tasks"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -32,5 +32,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/api/tasks"],
+  matcher: ["/calendario", "/api/tasks"],
 };

@@ -1,135 +1,216 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { MARCAS, SUBMARCAS_BY_MARCA, Marca } from "@/lib/config";
 
-interface CaptacaoEvent {
-  id: string;
-  name: string;
-  url: string;
-  start: number;
-  end: number;
-  marca: string | null;
-  submarca: string | null;
-  status: string;
-}
+type Prioridade = "urgent" | "high" | "normal" | "low";
 
-const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-
-const MARCA_COLOR_VAR: Record<string, string> = {
-  "SeuBoné": "--marca-seubone",
-  Carbone: "--marca-carbone",
-  Onevo: "--marca-onevo",
-  Weevo: "--marca-weevo",
-  Outro: "--marca-outro",
+const PRIORIDADE_LABEL: Record<Prioridade, string> = {
+  urgent: "Urgente",
+  high: "Alta",
+  normal: "Normal",
+  low: "Baixa",
 };
 
-function buildMonthGrid(year: number, month: number): Date[] {
-  const firstOfMonth = new Date(year, month, 1);
-  const startOffset = firstOfMonth.getDay();
-  const gridStart = new Date(year, month, 1 - startOffset);
+const NOME_STORAGE_KEY = "sb_agenda_nome";
 
-  return Array.from({ length: 42 }, (_, i) => {
-    const d = new Date(gridStart);
-    d.setDate(gridStart.getDate() + i);
-    return d;
-  });
+function NomePrompt({ onConfirm }: { onConfirm: (nome: string) => void }) {
+  const [nome, setNome] = useState("");
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = nome.trim();
+    if (!trimmed) return;
+    localStorage.setItem(NOME_STORAGE_KEY, trimmed);
+    onConfirm(trimmed);
+  }
+
+  return (
+    <div style={{ maxWidth: 360, margin: "80px auto" }}>
+      <h2>Quem está marcando?</h2>
+      <form onSubmit={handleSubmit}>
+        <label>
+          Seu nome
+          <input value={nome} onChange={(e) => setNome(e.target.value)} autoFocus required />
+        </label>
+        <button type="submit">Continuar</button>
+      </form>
+    </div>
+  );
 }
 
-function isSameDay(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
+export default function NovaCaptacaoPage() {
+  const [nome, setNome] = useState<string | null | undefined>(undefined);
 
-export default function CalendarPage() {
-  const today = new Date();
-  const [cursor, setCursor] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
-  const [events, setEvents] = useState<CaptacaoEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [titulo, setTitulo] = useState("");
+  const [marca, setMarca] = useState<Marca>("SeuBoné");
+  const [submarcaUuid, setSubmarcaUuid] = useState(SUBMARCAS_BY_MARCA["SeuBoné"][0].uuid);
+  const [data, setData] = useState("");
+  const [horaInicio, setHoraInicio] = useState("09:00");
+  const [horaFim, setHoraFim] = useState("11:00");
+  const [local, setLocal] = useState("");
+  const [solicitante, setSolicitante] = useState("");
+  const [prioridade, setPrioridade] = useState<Prioridade>("normal");
+
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   useEffect(() => {
-    setLoading(true);
-    fetch("/api/tasks")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.error) throw new Error(data.error);
-        setEvents(data.events);
-        setError(null);
-      })
-      .catch((err) => setError(err instanceof Error ? err.message : String(err)))
-      .finally(() => setLoading(false));
+    const stored = localStorage.getItem(NOME_STORAGE_KEY);
+    setNome(stored);
+    if (stored) setSolicitante(stored);
   }, []);
 
-  const days = useMemo(() => buildMonthGrid(cursor.getFullYear(), cursor.getMonth()), [cursor]);
+  const submarcaOptions = useMemo(() => SUBMARCAS_BY_MARCA[marca], [marca]);
 
-  const eventsByDay = useMemo(() => {
-    const map = new Map<string, CaptacaoEvent[]>();
-    for (const ev of events) {
-      const key = new Date(ev.start).toDateString();
-      const list = map.get(key) ?? [];
-      list.push(ev);
-      map.set(key, list);
+  function handleMarcaChange(novaMarca: Marca) {
+    setMarca(novaMarca);
+    setSubmarcaUuid(SUBMARCAS_BY_MARCA[novaMarca][0].uuid);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitting(true);
+    setResult(null);
+
+    try {
+      const res = await fetch("/api/captacoes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          titulo,
+          marca,
+          submarcaUuid,
+          data,
+          horaInicio,
+          horaFim,
+          local,
+          solicitante,
+          prioridade,
+        }),
+      });
+
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error ?? "Erro desconhecido");
+
+      let message = `Task criada: ${body.task.name} (${body.pontos} pontos).`;
+      if (body.precisaConfirmarPontuacao) {
+        message += " Duração acima de 4h — confirme a pontuação com a Maria Clara.";
+      }
+      setResult({ type: "success", message });
+      setTitulo("");
+      setLocal("");
+    } catch (err) {
+      setResult({ type: "error", message: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setSubmitting(false);
     }
-    return map;
-  }, [events]);
+  }
 
-  const monthLabel = cursor.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  if (nome === undefined) {
+    return null;
+  }
+
+  if (!nome) {
+    return (
+      <NomePrompt
+        onConfirm={(n) => {
+          setNome(n);
+          setSolicitante(n);
+        }}
+      />
+    );
+  }
 
   return (
     <div>
-      <div className="calendar-toolbar">
-        <button onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1))}>
-          ← Anterior
+      <h2>Nova captação</h2>
+      <p style={{ color: "var(--muted)", fontSize: 13, marginTop: -8 }}>
+        Marcando como <strong>{nome}</strong>.{" "}
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            localStorage.removeItem(NOME_STORAGE_KEY);
+            setNome(null);
+          }}
+        >
+          trocar
+        </a>
+      </p>
+      <form onSubmit={handleSubmit}>
+        <label>
+          Título
+          <input value={titulo} onChange={(e) => setTitulo(e.target.value)} required />
+        </label>
+
+        <div className="form-row">
+          <label>
+            Marca
+            <select value={marca} onChange={(e) => handleMarcaChange(e.target.value as Marca)}>
+              {MARCAS.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            Empresa
+            <select value={submarcaUuid} onChange={(e) => setSubmarcaUuid(e.target.value)}>
+              {submarcaOptions.map((opt) => (
+                <option key={opt.uuid} value={opt.uuid}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <label>
+          Data
+          <input type="date" value={data} onChange={(e) => setData(e.target.value)} required />
+        </label>
+
+        <div className="form-row">
+          <label>
+            Horário de início
+            <input type="time" value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} required />
+          </label>
+          <label>
+            Horário de fim
+            <input type="time" value={horaFim} onChange={(e) => setHoraFim(e.target.value)} required />
+          </label>
+        </div>
+
+        <label>
+          Local
+          <input value={local} onChange={(e) => setLocal(e.target.value)} />
+        </label>
+
+        <label>
+          Solicitante
+          <input value={solicitante} onChange={(e) => setSolicitante(e.target.value)} />
+        </label>
+
+        <label>
+          Prioridade
+          <select value={prioridade} onChange={(e) => setPrioridade(e.target.value as Prioridade)}>
+            {(Object.keys(PRIORIDADE_LABEL) as Prioridade[]).map((p) => (
+              <option key={p} value={p}>
+                {PRIORIDADE_LABEL[p]}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <button type="submit" disabled={submitting}>
+          {submitting ? "Criando…" : "Criar captação"}
         </button>
-        <strong style={{ textTransform: "capitalize" }}>{monthLabel}</strong>
-        <button onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1))}>
-          Próximo →
-        </button>
-      </div>
 
-      <div className="legend">
-        {Object.entries(MARCA_COLOR_VAR).map(([marca, cssVar]) => (
-          <span className="legend-item" key={marca}>
-            <span className="legend-swatch" style={{ background: `var(${cssVar})` }} />
-            {marca}
-          </span>
-        ))}
-      </div>
-
-      {loading && <p>Carregando captações do ClickUp…</p>}
-      {error && <p className="status-message error">Erro ao carregar: {error}</p>}
-
-      <div className="calendar-grid">
-        {WEEKDAYS.map((d) => (
-          <div className="calendar-weekday" key={d}>
-            {d}
-          </div>
-        ))}
-        {days.map((day) => {
-          const outside = day.getMonth() !== cursor.getMonth();
-          const dayEvents = eventsByDay.get(day.toDateString()) ?? [];
-          return (
-            <div className={`calendar-day${outside ? " outside" : ""}`} key={day.toISOString()}>
-              <div className="day-number">{day.getDate()}</div>
-              {dayEvents.map((ev) => {
-                const cssVar = ev.marca ? MARCA_COLOR_VAR[ev.marca] : "--marca-outro";
-                return (
-                  <a
-                    key={ev.id}
-                    className="event-pill"
-                    style={{ background: `var(${cssVar})` }}
-                    href={ev.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    title={ev.name}
-                  >
-                    {ev.name}
-                  </a>
-                );
-              })}
-            </div>
-          );
-        })}
-      </div>
+        {result && <div className={`status-message ${result.type}`}>{result.message}</div>}
+      </form>
     </div>
   );
 }
