@@ -17,6 +17,12 @@ ClickUp (comercial, sócios) via link público.
   "Sincronizado no Google Agenda" na descrição, cria o evento e grava o marcador.
 - `app/page.tsx` — calendário mensal colorido por marca.
 - `app/nova-captacao/page.tsx` — formulário de criação de captação.
+- `app/login/page.tsx` — tela de login (senha compartilhada, sem cadastro).
+- `middleware.ts` — protege o app inteiro: sem sessão válida, redireciona para `/login`
+  (páginas) ou responde 401 (rotas `/api/*`). `/login`, `/api/login`, `/api/logout` e
+  `/api/sync` ficam de fora (o `/api/sync` é autenticado pelo `CRON_SECRET`, não por sessão).
+- `lib/auth.ts` — gera/valida o cookie de sessão (hash da senha compartilhada, nunca a
+  senha em texto puro).
 - `app/api/captacoes` — cria a task no ClickUp com os 4 custom fields corretos.
 - `app/api/tasks` — lista as captações para o calendário.
 - `app/api/sync` — endpoint chamado pelo cron para rodar a sincronização.
@@ -32,6 +38,9 @@ ClickUp (comercial, sócios) via link público.
      e **compartilhe o calendário dedicado com o e-mail da service account** (permissão
      "Fazer alterações nos eventos").
    - `CRON_SECRET`: qualquer string aleatória, usada para proteger `/api/sync`.
+   - `APP_PASSWORD`: a senha compartilhada que dá acesso ao app inteiro (calendário e
+     formulário). Combine com quem vai usar o sistema e troque periodicamente editando
+     essa variável — trocar a senha invalida todas as sessões abertas automaticamente.
 2. `npm install`
 3. `npm run dev` e acesse `http://localhost:3000`.
 

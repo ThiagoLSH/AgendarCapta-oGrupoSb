@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import Header from "./Header";
 
 export const metadata: Metadata = {
   title: "Agenda de Captação — Grupo SB",
@@ -11,13 +12,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="pt-BR">
       <body>
         <div className="app-shell">
-          <header className="app-header">
-            <h1>Agenda de Captação — Grupo SB</h1>
-            <nav>
-              <a href="/">Calendário</a>
-              <a href="/nova-captacao">Nova captação</a>
-            </nav>
-          </header>
+          <Header />
           <main>{children}</main>
         </div>
       </body>
