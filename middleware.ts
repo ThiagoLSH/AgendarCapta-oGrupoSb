@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isValidSession, SESSION_COOKIE_NAME } from "@/lib/auth";
 
-// Rotas acessíveis sem sessão de navegador:
-// - /login e /api/login: a própria tela de entrada.
-// - /api/logout: precisa ser chamável mesmo com sessão inválida/expirada.
-// - /api/sync: chamado pelo cron externo (cron-job.org), autenticado pelo CRON_SECRET,
-//   nunca por um navegador logado.
-const PUBLIC_PATHS = ["/login", "/api/login", "/api/logout", "/api/sync"];
+// Só a visualização do calendário geral exige a senha de gestor — marcar uma captação
+// (/nova-captacao e /api/captacoes) fica aberto pra qualquer um, sem senha nenhuma.
+const PROTECTED_PATHS = ["/", "/api/tasks"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  if (PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))) {
+  const isProtected = PROTECTED_PATHS.some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`)
+  );
+  if (!isProtected) {
     return NextResponse.next();
   }
 
@@ -32,5 +32,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/", "/api/tasks"],
 };

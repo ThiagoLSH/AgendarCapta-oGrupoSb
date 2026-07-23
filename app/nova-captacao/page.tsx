@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MARCAS, SUBMARCAS_BY_MARCA, Marca } from "@/lib/config";
 
 type Prioridade = "urgent" | "high" | "normal" | "low";
@@ -12,7 +12,36 @@ const PRIORIDADE_LABEL: Record<Prioridade, string> = {
   low: "Baixa",
 };
 
+const NOME_STORAGE_KEY = "sb_agenda_nome";
+
+function NomePrompt({ onConfirm }: { onConfirm: (nome: string) => void }) {
+  const [nome, setNome] = useState("");
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = nome.trim();
+    if (!trimmed) return;
+    localStorage.setItem(NOME_STORAGE_KEY, trimmed);
+    onConfirm(trimmed);
+  }
+
+  return (
+    <div style={{ maxWidth: 360, margin: "80px auto" }}>
+      <h2>Quem está marcando?</h2>
+      <form onSubmit={handleSubmit}>
+        <label>
+          Seu nome
+          <input value={nome} onChange={(e) => setNome(e.target.value)} autoFocus required />
+        </label>
+        <button type="submit">Continuar</button>
+      </form>
+    </div>
+  );
+}
+
 export default function NovaCaptacaoPage() {
+  const [nome, setNome] = useState<string | null | undefined>(undefined);
+
   const [titulo, setTitulo] = useState("");
   const [marca, setMarca] = useState<Marca>("SeuBoné");
   const [submarcaUuid, setSubmarcaUuid] = useState(SUBMARCAS_BY_MARCA["SeuBoné"][0].uuid);
@@ -25,6 +54,12 @@ export default function NovaCaptacaoPage() {
 
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  useEffect(() => {
+    const stored = localStorage.getItem(NOME_STORAGE_KEY);
+    setNome(stored);
+    if (stored) setSolicitante(stored);
+  }, []);
 
   const submarcaOptions = useMemo(() => SUBMARCAS_BY_MARCA[marca], [marca]);
 
@@ -65,7 +100,6 @@ export default function NovaCaptacaoPage() {
       setResult({ type: "success", message });
       setTitulo("");
       setLocal("");
-      setSolicitante("");
     } catch (err) {
       setResult({ type: "error", message: err instanceof Error ? err.message : String(err) });
     } finally {
@@ -73,9 +107,37 @@ export default function NovaCaptacaoPage() {
     }
   }
 
+  if (nome === undefined) {
+    return null;
+  }
+
+  if (!nome) {
+    return (
+      <NomePrompt
+        onConfirm={(n) => {
+          setNome(n);
+          setSolicitante(n);
+        }}
+      />
+    );
+  }
+
   return (
     <div>
       <h2>Nova captação</h2>
+      <p style={{ color: "var(--muted)", fontSize: 13, marginTop: -8 }}>
+        Marcando como <strong>{nome}</strong>.{" "}
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            localStorage.removeItem(NOME_STORAGE_KEY);
+            setNome(null);
+          }}
+        >
+          trocar
+        </a>
+      </p>
       <form onSubmit={handleSubmit}>
         <label>
           Título

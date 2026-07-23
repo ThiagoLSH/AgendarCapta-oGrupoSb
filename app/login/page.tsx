@@ -37,9 +37,12 @@ function LoginForm() {
   return (
     <div style={{ maxWidth: 360, margin: "80px auto" }}>
       <h2>Entrar</h2>
+      <p style={{ color: "var(--muted)", fontSize: 13, marginTop: -8 }}>
+        Acesso restrito à visualização do calendário geral, para gestores.
+      </p>
       <form onSubmit={handleSubmit}>
         <label>
-          Senha de acesso
+          Senha de gestor
           <input
             type="password"
             value={password}

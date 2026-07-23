@@ -15,12 +15,15 @@ ClickUp (comercial, sócios) via link público.
   calendário dedicado. Nunca toca no calendário pessoal do Thiago.
 - `lib/sync.ts` — lógica de sincronização: varre a lista, ignora tasks já marcadas com
   "Sincronizado no Google Agenda" na descrição, cria o evento e grava o marcador.
-- `app/page.tsx` — calendário mensal colorido por marca.
-- `app/nova-captacao/page.tsx` — formulário de criação de captação.
-- `app/login/page.tsx` — tela de login (senha compartilhada, sem cadastro).
-- `middleware.ts` — protege o app inteiro: sem sessão válida, redireciona para `/login`
-  (páginas) ou responde 401 (rotas `/api/*`). `/login`, `/api/login`, `/api/logout` e
-  `/api/sync` ficam de fora (o `/api/sync` é autenticado pelo `CRON_SECRET`, não por sessão).
+- `app/page.tsx` — calendário mensal colorido por marca. Protegido por senha de gestor.
+- `app/nova-captacao/page.tsx` — formulário de criação de captação. Aberto pra qualquer
+  um com o link (sem senha) — só pede o nome da pessoa antes, pra preencher o campo
+  "Solicitante" (guardado no navegador via `localStorage`, não precisa digitar de novo).
+- `app/login/page.tsx` — tela de login (senha compartilhada, sem cadastro) só pra ver o
+  calendário geral.
+- `middleware.ts` — protege só `/` (calendário) e `/api/tasks` (dados do calendário).
+  Sem sessão válida, redireciona para `/login` ou responde 401. Tudo o mais (marcar
+  captação, `/api/sync`) fica aberto.
 - `lib/auth.ts` — gera/valida o cookie de sessão (hash da senha compartilhada, nunca a
   senha em texto puro).
 - `app/api/captacoes` — cria a task no ClickUp com os 4 custom fields corretos.
@@ -38,9 +41,9 @@ ClickUp (comercial, sócios) via link público.
      e **compartilhe o calendário dedicado com o e-mail da service account** (permissão
      "Fazer alterações nos eventos").
    - `CRON_SECRET`: qualquer string aleatória, usada para proteger `/api/sync`.
-   - `APP_PASSWORD`: a senha compartilhada que dá acesso ao app inteiro (calendário e
-     formulário). Combine com quem vai usar o sistema e troque periodicamente editando
-     essa variável — trocar a senha invalida todas as sessões abertas automaticamente.
+   - `APP_PASSWORD`: a senha que dá acesso à visualização do calendário geral. Só passe
+     essa senha para gestores — quem só vai marcar uma captação não precisa dela, o
+     formulário fica aberto. Trocar essa variável invalida todas as sessões abertas.
 2. `npm install`
 3. `npm run dev` e acesse `http://localhost:3000`.
 
