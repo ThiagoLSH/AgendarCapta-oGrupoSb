@@ -8,9 +8,9 @@
   --accent: #4340d3;
 
   --marca-seubone: #e0a72a;
-  --marca-carbone: #2f8f4e;
-  --marca-onevo: #2f6fed;
-  --marca-weevo: #d3418f;
+  --marca-carbone: #610000;
+  --marca-onevo: #1a3a00;
+  --marca-weevo: #00e29e;
   --marca-outro: #6b6b78;
 }
 
@@ -89,8 +89,10 @@ body {
   border: 1px solid var(--border);
   border-radius: 8px;
   min-height: 96px;
+  min-width: 0;
   padding: 6px;
   font-size: 12px;
+  overflow: hidden;
 }
 
 .calendar-day.outside {
