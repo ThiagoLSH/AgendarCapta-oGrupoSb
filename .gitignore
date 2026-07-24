@@ -8,3 +8,6 @@ out
 .DS_Store
 .claude/
 *.tsbuildinfo
+
+.vercel
+.env*

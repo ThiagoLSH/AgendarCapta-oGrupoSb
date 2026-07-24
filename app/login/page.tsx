@@ -1,14 +1,26 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [names, setNames] = useState<string[]>([]);
+  const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/managers")
+      .then((res) => res.json())
+      .then((data) => {
+        setNames(data.names ?? []);
+        if (data.names?.length) setName(data.names[0]);
+      })
+      .catch(() => setNames([]));
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -19,7 +31,7 @@ function LoginForm() {
       const res = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ name, password }),
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? "Erro ao entrar");
@@ -42,7 +54,17 @@ function LoginForm() {
       </p>
       <form onSubmit={handleSubmit}>
         <label>
-          Senha de gestor
+          Gestor
+          <select value={name} onChange={(e) => setName(e.target.value)} required>
+            {names.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Senha
           <input
             type="password"
             value={password}

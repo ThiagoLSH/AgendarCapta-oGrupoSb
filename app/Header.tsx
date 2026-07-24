@@ -7,14 +7,14 @@ import LogoutButton from "./LogoutButton";
 export default function Header() {
   const pathname = usePathname();
   const isLoginPage = pathname === "/login";
-  const [isManager, setIsManager] = useState(false);
+  const [managerName, setManagerName] = useState<string | null>(null);
 
   useEffect(() => {
     if (isLoginPage) return;
     fetch("/api/session")
       .then((res) => res.json())
-      .then((data) => setIsManager(!!data.authenticated))
-      .catch(() => setIsManager(false));
+      .then((data) => setManagerName(data.authenticated ? data.name : null))
+      .catch(() => setManagerName(null));
   }, [isLoginPage, pathname]);
 
   return (
@@ -24,7 +24,12 @@ export default function Header() {
         <nav>
           <a href="/">Nova captação</a>
           <a href="/calendario">Calendário</a>
-          {isManager && <LogoutButton />}
+          {managerName && (
+            <>
+              <span style={{ color: "var(--muted)", fontWeight: 400 }}>Olá, {managerName}</span>
+              <LogoutButton />
+            </>
+          )}
         </nav>
       )}
     </header>

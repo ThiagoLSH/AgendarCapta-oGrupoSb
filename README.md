@@ -28,13 +28,16 @@ ClickUp (comercial, sócios) via link público.
   Protegido por senha de gestor — só pede a senha quando alguém clica em "Calendário".
 - `app/nova-captacao/page.tsx` — redirect pra `/`, mantido só por compatibilidade com
   links antigos já compartilhados.
-- `app/login/page.tsx` — tela de login (senha compartilhada, sem cadastro) só pra ver o
-  calendário geral.
+- `app/login/page.tsx` — tela de login (nome + senha individual, sem cadastro) só pra ver
+  o calendário geral. Todo gestor vê o mesmo calendário completo (todas as marcas) — o
+  login individual é só pra controle de quem acessou, não filtra por marca.
+- `app/api/managers` — lista só os nomes dos gestores (nunca as senhas), pra popular o
+  seletor da tela de login.
 - `middleware.ts` — protege só `/calendario` e `/api/tasks` (dados do calendário). Sem
   sessão válida, redireciona para `/login` ou responde 401. Tudo o mais (marcar
   captação, `/api/sync`) fica aberto.
-- `lib/auth.ts` — gera/valida o cookie de sessão (hash da senha compartilhada, nunca a
-  senha em texto puro).
+- `lib/auth.ts` — verifica nome+senha contra `APP_MANAGERS` e gera/valida o cookie de
+  sessão (hash de nome+senha, nunca a senha em texto puro).
 - `app/api/captacoes` — cria a task no ClickUp com os 4 custom fields corretos.
 - `app/api/tasks` — lista as captações para o calendário.
 - `app/api/sync` — endpoint chamado pelo cron para rodar a sincronização.
@@ -50,9 +53,10 @@ ClickUp (comercial, sócios) via link público.
      e **compartilhe o calendário dedicado com o e-mail da service account** (permissão
      "Fazer alterações nos eventos").
    - `CRON_SECRET`: qualquer string aleatória, usada para proteger `/api/sync`.
-   - `APP_PASSWORD`: a senha que dá acesso à visualização do calendário geral. Só passe
-     essa senha para gestores — quem só vai marcar uma captação não precisa dela, o
-     formulário fica aberto. Trocar essa variável invalida todas as sessões abertas.
+   - `APP_MANAGERS`: JSON (em uma linha só) com os gestores que podem ver o calendário
+     geral, cada um com login individual: `[{"name":"Fulano","password":"..."}, ...]`.
+     Quem só vai marcar uma captação não precisa disso, o formulário fica aberto. Trocar
+     a senha de alguém invalida só a sessão dela; remover alguém da lista invalida a dela.
 2. `npm install`
 3. `npm run dev` e acesse `http://localhost:3000`.
 
