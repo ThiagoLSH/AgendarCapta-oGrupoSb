@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import LogoutButton from "./LogoutButton";
+import ThemeToggle from "./ThemeToggle";
 
 export default function Header() {
   const pathname = usePathname();
@@ -19,18 +20,32 @@ export default function Header() {
 
   return (
     <header className="app-header">
-      <h1>Agenda de Captação — Grupo SB</h1>
+      <div className="brand">
+        <h1>Agenda de Captação</h1>
+        <span className="brand-tag">Grupo SB</span>
+      </div>
       {!isLoginPage && (
         <nav>
-          <a href="/">Nova captação</a>
-          <a href="/calendario">Calendário</a>
-          {session?.role === "master" && <a href="/admin">Admin</a>}
-          {session && (
-            <>
-              <span style={{ color: "var(--muted)", fontWeight: 400 }}>Olá, {session.name}</span>
-              <LogoutButton />
-            </>
+          <a href="/" className={pathname === "/" ? "active" : ""}>
+            Nova captação
+          </a>
+          <a href="/calendario" className={pathname === "/calendario" ? "active" : ""}>
+            Calendário
+          </a>
+          {session?.role === "master" && (
+            <a href="/admin" className={pathname === "/admin" ? "active" : ""}>
+              Admin
+            </a>
           )}
+          {session && (
+            <span className="session-info">
+              <span>
+                Olá, <strong style={{ color: "var(--text)", fontWeight: 600 }}>{session.name}</strong>
+              </span>
+              <LogoutButton />
+            </span>
+          )}
+          <ThemeToggle />
         </nav>
       )}
     </header>

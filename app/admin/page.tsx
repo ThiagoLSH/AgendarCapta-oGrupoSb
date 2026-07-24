@@ -12,8 +12,17 @@ interface CaptacaoEvent {
   name: string;
   url: string;
   start: number;
+  marca: string | null;
   status: string;
 }
+
+const MARCA_COLOR_VAR: Record<string, string> = {
+  "SeuBoné": "--marca-seubone",
+  Carbone: "--marca-carbone",
+  Onevo: "--marca-onevo",
+  Weevo: "--marca-weevo",
+  Outro: "--marca-outro",
+};
 
 export default function AdminPage() {
   const [managers, setManagers] = useState<ManagerRow[]>([]);
@@ -117,115 +126,99 @@ export default function AdminPage() {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
-      <h2>Painel Master</h2>
+    <div style={{ maxWidth: 820, margin: "0 auto", display: "flex", flexDirection: "column", gap: 34 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <h2 style={{ margin: 0 }}>Painel Master</h2>
+        <span className="badge-header">Acesso total</span>
+      </div>
 
       <section>
-        <h3 style={{ marginBottom: 8 }}>Gestores</h3>
+        <h3 style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 12 }}>
+          Gestores
+        </h3>
         {managersError && <div className="status-message error">{managersError}</div>}
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
+        <div className="row-list" style={{ marginBottom: 18 }}>
           {managers.map((m) => (
-            <div
-              key={m.name}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                background: "var(--card)",
-                border: "1px solid var(--border)",
-                borderRadius: 6,
-                padding: "8px 12px",
-              }}
-            >
-              <span>
-                {m.name} <span style={{ color: "var(--muted)", fontSize: 12 }}>({m.role})</span>
+            <div key={m.name} className="row-item">
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 10, fontSize: 14, fontWeight: 600 }}>
+                {m.name}
+                <span className={m.role === "master" ? "badge badge-master" : "badge badge-gestor"}>
+                  {m.role === "master" ? "Master" : "Gestor"}
+                </span>
               </span>
-              <button
-                type="button"
-                onClick={() => handleRemoveManager(m.name)}
-                style={{
-                  background: "none",
-                  border: "1px solid var(--border)",
-                  borderRadius: 6,
-                  padding: "4px 10px",
-                  cursor: "pointer",
-                  fontSize: 12,
-                }}
-              >
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => handleRemoveManager(m.name)}>
                 Remover
               </button>
             </div>
           ))}
         </div>
 
-        <form onSubmit={handleAddManager} style={{ maxWidth: 480 }}>
-          <label>
-            Nome
-            <input value={novoNome} onChange={(e) => setNovoNome(e.target.value)} required />
-          </label>
-          <label>
-            Senha
-            <input value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)} required />
-          </label>
-          <label>
-            Papel
-            <select value={novoRole} onChange={(e) => setNovoRole(e.target.value as "gestor" | "master")}>
-              <option value="gestor">Gestor (vê o calendário)</option>
-              <option value="master">Master (vê o calendário + este painel)</option>
-            </select>
-          </label>
-          <button type="submit" disabled={addingManager}>
-            {addingManager ? "Adicionando…" : "Adicionar gestor"}
-          </button>
-        </form>
+        <div className="card" style={{ padding: 20 }}>
+          <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)", margin: "0 0 14px" }}>
+            Adicionar gestor
+          </p>
+          <form
+            onSubmit={handleAddManager}
+            style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr auto", gap: 12, alignItems: "end" }}
+          >
+            <div>
+              <label>Nome</label>
+              <input value={novoNome} onChange={(e) => setNovoNome(e.target.value)} required />
+            </div>
+            <div>
+              <label>Senha</label>
+              <input value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)} required />
+            </div>
+            <div>
+              <label>Papel</label>
+              <select value={novoRole} onChange={(e) => setNovoRole(e.target.value as "gestor" | "master")}>
+                <option value="gestor">Gestor</option>
+                <option value="master">Master</option>
+              </select>
+            </div>
+            <button type="submit" className="btn btn-primary" disabled={addingManager}>
+              {addingManager ? "Adicionando…" : "Adicionar"}
+            </button>
+          </form>
+        </div>
       </section>
 
       <section>
-        <h3 style={{ marginBottom: 8 }}>Captações</h3>
+        <h3 style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 12 }}>
+          Captações
+        </h3>
         {captacoesError && <div className="status-message error">{captacoesError}</div>}
         {captacoesLoading && <p>Carregando captações…</p>}
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {captacoes.map((c) => (
-            <div
-              key={c.id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                background: "var(--card)",
-                border: "1px solid var(--border)",
-                borderRadius: 6,
-                padding: "8px 12px",
-                gap: 12,
-              }}
-            >
-              <a href={c.url} target="_blank" rel="noreferrer" style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {c.name}
+        <div className="row-list">
+          {captacoes.map((c) => {
+            const cssVar = c.marca ? MARCA_COLOR_VAR[c.marca] : "--marca-outro";
+            return (
+              <div key={c.id} className="row-item">
+                <div className="row-main">
+                  <span className="row-bar" style={{ background: `var(${cssVar})` }} />
+                  <div style={{ minWidth: 0 }}>
+                    <div className="row-name">{c.name}</div>
+                    <div className="row-meta">
+                      {new Date(c.start).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })} ·{" "}
+                      {c.status}{" "}
+                      <a href={c.url} target="_blank" rel="noreferrer">
+                        ver no ClickUp
+                      </a>
+                    </div>
+                  </div>
                 </div>
-                <div style={{ color: "var(--muted)", fontSize: 12 }}>
-                  {new Date(c.start).toLocaleString("pt-BR")} — {c.status}
-                </div>
-              </a>
-              <button
-                type="button"
-                onClick={() => handleDeleteCaptacao(c.id, c.name)}
-                disabled={deletingId === c.id}
-                style={{
-                  background: "#a3312c",
-                  color: "white",
-                  border: "none",
-                  borderRadius: 6,
-                  padding: "6px 12px",
-                  cursor: "pointer",
-                  fontSize: 12,
-                  flexShrink: 0,
-                }}
-              >
-                {deletingId === c.id ? "Excluindo…" : "Excluir"}
-              </button>
-            </div>
-          ))}
+                <button
+                  type="button"
+                  className="btn btn-danger btn-sm"
+                  onClick={() => handleDeleteCaptacao(c.id, c.name)}
+                  disabled={deletingId === c.id}
+                  style={{ flexShrink: 0 }}
+                >
+                  {deletingId === c.id ? "Excluindo…" : "Excluir"}
+                </button>
+              </div>
+            );
+          })}
         </div>
       </section>
     </div>

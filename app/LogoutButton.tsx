@@ -12,8 +12,8 @@ export default function LogoutButton() {
   }
 
   return (
-    <a href="#" onClick={(e) => { e.preventDefault(); handleLogout(); }}>
+    <button type="button" className="btn btn-ghost btn-sm" onClick={handleLogout}>
       Sair
-    </a>
+    </button>
   );
 }

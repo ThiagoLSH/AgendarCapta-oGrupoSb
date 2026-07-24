@@ -47,14 +47,13 @@ function LoginForm() {
   }
 
   return (
-    <div style={{ maxWidth: 360, margin: "80px auto" }}>
+    <div className="card card-narrow">
+      <div className="accent-tick" />
       <h2>Entrar</h2>
-      <p style={{ color: "var(--muted)", fontSize: 13, marginTop: -8 }}>
-        Acesso restrito à visualização do calendário geral, para gestores.
-      </p>
+      <p className="subtitle">Acesso restrito à visualização do calendário geral, para gestores.</p>
       <form onSubmit={handleSubmit}>
-        <label>
-          Gestor
+        <div className="field-group">
+          <label>Gestor</label>
           <select value={name} onChange={(e) => setName(e.target.value)} required>
             {names.map((n) => (
               <option key={n} value={n}>
@@ -62,18 +61,19 @@ function LoginForm() {
               </option>
             ))}
           </select>
-        </label>
-        <label>
-          Senha
+        </div>
+        <div className="field-group">
+          <label>Senha</label>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            placeholder="Sua senha individual"
             autoFocus
             required
           />
-        </label>
-        <button type="submit" disabled={submitting}>
+        </div>
+        <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
           {submitting ? "Entrando…" : "Entrar"}
         </button>
         {error && <div className="status-message error">{error}</div>}
