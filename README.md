@@ -33,11 +33,15 @@ ClickUp (comercial, sócios) via link público.
   login individual é só pra controle de quem acessou, não filtra por marca.
 - `app/api/managers` — lista só os nomes dos gestores (nunca as senhas), pra popular o
   seletor da tela de login.
-- `middleware.ts` — protege só `/calendario` e `/api/tasks` (dados do calendário). Sem
-  sessão válida, redireciona para `/login` ou responde 401. Tudo o mais (marcar
-  captação, `/api/sync`) fica aberto.
-- `lib/auth.ts` — verifica nome+senha contra `APP_MANAGERS` e gera/valida o cookie de
-  sessão (hash de nome+senha, nunca a senha em texto puro).
+- `app/admin/page.tsx` (rota `/admin`) — painel exclusivo do role "master": adicionar/
+  remover gestor, e excluir uma captação por completo (ClickUp + evento no Google
+  Calendar). `middleware.ts` bloqueia essa rota (e `/api/admin/*`) pra quem não é master.
+- `middleware.ts` — protege `/calendario` e `/api/tasks` (qualquer gestor) e `/admin` +
+  `/api/admin/*` (só role "master"). Sem sessão válida, redireciona para `/login` ou
+  responde 401/403. Tudo o mais (marcar captação, `/api/sync`) fica aberto.
+- `lib/auth.ts` — lê/grava a lista de gestores no Vercel Edge Config (não numa env var —
+  o painel Master precisa adicionar/remover gestor em tempo real, sem redeploy) e gera/
+  valida o cookie de sessão (hash de nome+senha, nunca a senha em texto puro).
 - `app/api/captacoes` — cria a task no ClickUp com os 4 custom fields corretos.
 - `app/api/tasks` — lista as captações para o calendário.
 - `app/api/sync` — endpoint chamado pelo cron para rodar a sincronização.
@@ -53,10 +57,16 @@ ClickUp (comercial, sócios) via link público.
      e **compartilhe o calendário dedicado com o e-mail da service account** (permissão
      "Fazer alterações nos eventos").
    - `CRON_SECRET`: qualquer string aleatória, usada para proteger `/api/sync`.
-   - `APP_MANAGERS`: JSON (em uma linha só) com os gestores que podem ver o calendário
-     geral, cada um com login individual: `[{"name":"Fulano","password":"..."}, ...]`.
-     Quem só vai marcar uma captação não precisa disso, o formulário fica aberto. Trocar
-     a senha de alguém invalida só a sessão dela; remover alguém da lista invalida a dela.
+   - `EDGE_CONFIG` / `EDGE_CONFIG_ID` / `VERCEL_API_TOKEN`: guardam a lista de gestores
+     (nome, senha, role). Crie um Edge Config (`vercel edge-config add <slug>`), gere um
+     read token (`vercel edge-config tokens <id> --add <label>`) e monte a connection
+     string `https://edge-config.vercel.com/<id>?token=<token>` pro `EDGE_CONFIG`. O
+     `VERCEL_API_TOKEN` é um token pessoal (vercel.com/account/tokens) usado só pra
+     escrever quando o painel Master adiciona/remove um gestor.
+   - Popule o item inicial `managers` no Edge Config com pelo menos um role "master":
+     `vercel edge-config update <id> --patch '{"items":[{"operation":"upsert","key":"managers","value":[{"name":"Fulano","password":"...","role":"master"}]}]}'`.
+     Quem só vai marcar uma captação não precisa de nada disso, o formulário fica aberto.
+     Trocar/remover a senha de alguém invalida só a sessão dela.
 2. `npm install`
 3. `npm run dev` e acesse `http://localhost:3000`.
 

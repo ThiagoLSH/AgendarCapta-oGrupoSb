@@ -6,9 +6,10 @@ export const dynamic = "force-dynamic";
 const THIRTY_DAYS_SECONDS = 60 * 60 * 24 * 30;
 
 export async function POST(req: NextRequest) {
-  if (getManagers().length === 0) {
+  const managers = await getManagers();
+  if (managers.length === 0) {
     return NextResponse.json(
-      { error: "APP_MANAGERS não configurado no servidor." },
+      { error: "Nenhum gestor configurado no servidor (Edge Config vazio)." },
       { status: 500 }
     );
   }

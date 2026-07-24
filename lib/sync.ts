@@ -9,6 +9,17 @@ function alreadySynced(task: ClickUpTask): boolean {
 }
 
 /**
+ * Extrai o ID do evento do Google Calendar do marcador gravado na descrição da task.
+ * Aceita tanto "(event: id)" (formato atual) quanto "(evento id)" (formato do
+ * protótipo antigo no Cowork), sem depender de crachá específico de pontuação.
+ */
+export function extractGoogleEventId(task: ClickUpTask): string | null {
+  const description = task.description ?? task.text_content ?? "";
+  const match = description.match(/\(event[o]?:?\s+([a-z0-9_-]+)\)/i);
+  return match ? match[1] : null;
+}
+
+/**
  * Cria o evento no Google Calendar dedicado pra uma task e grava o marcador de
  * sincronização na descrição. Usada tanto pela criação de captação (sync imediato)
  * quanto pelo cron periódico (sync das que passaram batidas, ex: geradas fora do site).

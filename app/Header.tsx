@@ -7,14 +7,14 @@ import LogoutButton from "./LogoutButton";
 export default function Header() {
   const pathname = usePathname();
   const isLoginPage = pathname === "/login";
-  const [managerName, setManagerName] = useState<string | null>(null);
+  const [session, setSession] = useState<{ name: string; role: string } | null>(null);
 
   useEffect(() => {
     if (isLoginPage) return;
     fetch("/api/session")
       .then((res) => res.json())
-      .then((data) => setManagerName(data.authenticated ? data.name : null))
-      .catch(() => setManagerName(null));
+      .then((data) => setSession(data.authenticated ? { name: data.name, role: data.role } : null))
+      .catch(() => setSession(null));
   }, [isLoginPage, pathname]);
 
   return (
@@ -24,9 +24,10 @@ export default function Header() {
         <nav>
           <a href="/">Nova captação</a>
           <a href="/calendario">Calendário</a>
-          {managerName && (
+          {session?.role === "master" && <a href="/admin">Admin</a>}
+          {session && (
             <>
-              <span style={{ color: "var(--muted)", fontWeight: 400 }}>Olá, {managerName}</span>
+              <span style={{ color: "var(--muted)", fontWeight: 400 }}>Olá, {session.name}</span>
               <LogoutButton />
             </>
           )}

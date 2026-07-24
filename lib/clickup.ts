@@ -28,7 +28,8 @@ async function clickupFetch<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(`ClickUp API ${res.status} ${res.statusText} em ${path}: ${body}`);
   }
 
-  return res.json() as Promise<T>;
+  const text = await res.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 export interface ClickUpCustomFieldValue {
@@ -143,6 +144,15 @@ export async function updateTaskDescription(taskId: string, description: string)
     method: "PUT",
     body: JSON.stringify({ description }),
   });
+}
+
+export async function getTask(taskId: string): Promise<ClickUpTask> {
+  return clickupFetch<ClickUpTask>(`/task/${taskId}`);
+}
+
+/** Apaga a task no ClickUp (usado pelo painel Master pra excluir uma captação). */
+export async function deleteTask(taskId: string): Promise<void> {
+  await clickupFetch(`/task/${taskId}`, { method: "DELETE" });
 }
 
 export function getCustomFieldValue(task: ClickUpTask, fieldId: string): unknown {
