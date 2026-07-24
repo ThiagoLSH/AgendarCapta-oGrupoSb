@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createCaptacaoTask } from "@/lib/clickup";
-import { buildTaskName } from "@/lib/naming";
+import { addTaskDependency, createCaptacaoTask, createRoteiroTask } from "@/lib/clickup";
+import { buildRoteiroTaskName, buildTaskName } from "@/lib/naming";
 import { Marca, MARCAS, SUBMARCAS_BY_MARCA, pontosFromDuracaoHoras } from "@/lib/config";
 import { syncSingleTask } from "@/lib/sync";
 
@@ -14,8 +14,14 @@ interface CreateCaptacaoBody {
   data: string; // "YYYY-MM-DD"
   horaInicio: string; // "HH:mm"
   horaFim: string; // "HH:mm"
-  local?: string;
-  solicitante?: string;
+  local: string;
+  solicitante: string;
+  quemSeraCaptado: string;
+  briefing: string;
+  roteiroPronto: boolean;
+  roteiroTexto?: string;
+  /** true quando um PDF será enviado logo em seguida via /api/captacoes/[taskId]/anexo */
+  roteiroTemArquivo?: boolean;
   prioridade: "urgent" | "high" | "normal" | "low";
 }
 
@@ -33,8 +39,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  if (!body.titulo || !body.marca || !body.submarcaUuid || !body.data || !body.horaInicio || !body.horaFim) {
-    return NextResponse.json({ error: "Campos obrigatórios ausentes" }, { status: 400 });
+  const camposObrigatorios: (keyof CreateCaptacaoBody)[] = [
+    "titulo",
+    "marca",
+    "submarcaUuid",
+    "data",
+    "horaInicio",
+    "horaFim",
+    "local",
+    "solicitante",
+    "quemSeraCaptado",
+    "briefing",
+  ];
+  const faltando = camposObrigatorios.filter((campo) => !body[campo]);
+  if (faltando.length > 0 || typeof body.roteiroPronto !== "boolean") {
+    return NextResponse.json(
+      { error: `Campos obrigatórios ausentes: ${faltando.join(", ") || "roteiroPronto"}` },
+      { status: 400 }
+    );
+  }
+
+  if (body.roteiroPronto && !body.roteiroTexto && !body.roteiroTemArquivo) {
+    return NextResponse.json(
+      { error: "Roteiro é obrigatório quando já está pronto (texto ou PDF)" },
+      { status: 400 }
+    );
   }
 
   if (!MARCAS.includes(body.marca)) {
@@ -59,9 +88,19 @@ export async function POST(req: NextRequest) {
   const name = buildTaskName({ marca: body.marca, titulo: body.titulo, inicio });
 
   const descriptionLines = [
-    body.local ? `Local: ${body.local}` : null,
-    body.solicitante ? `Solicitante: ${body.solicitante}` : null,
-  ].filter(Boolean);
+    `Local: ${body.local}`,
+    `Solicitante: ${body.solicitante}`,
+    `Quem será captado: ${body.quemSeraCaptado}`,
+    "",
+    "Briefing:",
+    body.briefing,
+    "",
+    body.roteiroPronto
+      ? body.roteiroTexto
+        ? `Roteiro:\n${body.roteiroTexto}`
+        : "Roteiro: anexado em PDF (ver anexos da task)."
+      : null,
+  ].filter((line): line is string => line !== null);
 
   try {
     const task = await createCaptacaoTask({
@@ -73,6 +112,23 @@ export async function POST(req: NextRequest) {
       pontos,
       priority: body.prioridade,
     });
+
+    let roteiroTask: { id: string; name: string; url: string } | null = null;
+    let roteiroTaskError: string | null = null;
+
+    if (!body.roteiroPronto) {
+      try {
+        const created = await createRoteiroTask({
+          name: buildRoteiroTaskName({ marca: body.marca, titulo: body.titulo }),
+          description: `Briefing:\n${body.briefing}\n\nCaptação relacionada: ${task.url}`,
+          empresaUuid: body.submarcaUuid,
+        });
+        await addTaskDependency(task.id, created.id);
+        roteiroTask = { id: created.id, name: created.name, url: created.url };
+      } catch (err) {
+        roteiroTaskError = err instanceof Error ? err.message : String(err);
+      }
+    }
 
     let calendarSyncError: string | null = null;
     try {
@@ -88,6 +144,8 @@ export async function POST(req: NextRequest) {
       pontos,
       precisaConfirmarPontuacao: precisaConfirmar,
       calendarSyncError,
+      roteiroTask,
+      roteiroTaskError,
     });
   } catch (err) {
     return NextResponse.json(

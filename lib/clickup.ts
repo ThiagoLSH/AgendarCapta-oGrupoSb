@@ -148,3 +148,61 @@ export async function updateTaskDescription(taskId: string, description: string)
 export function getCustomFieldValue(task: ClickUpTask, fieldId: string): unknown {
   return task.custom_fields.find((f) => f.id === fieldId)?.value;
 }
+
+export interface CreateRoteiroInput {
+  name: string;
+  description: string;
+  empresaUuid: string;
+}
+
+/**
+ * Cria a task de roteiro pro Zion escrever, quando quem marcou a captação não tem
+ * roteiro pronto. Fica na mesma lista House Quatro5, sem os campos de pontuação de
+ * captação (não é uma task de captação).
+ */
+export async function createRoteiroTask(input: CreateRoteiroInput): Promise<ClickUpTask> {
+  const body = {
+    name: input.name,
+    description: input.description,
+    assignees: [Number(CLICKUP.zionUserId)],
+    custom_fields: [
+      { id: CUSTOM_FIELDS.empresa, value: [input.empresaUuid] },
+      { id: CUSTOM_FIELDS.tarefasSkill, value: [FIXED_FIELD_VALUES.tarefasSkillRoteiro] },
+      { id: CUSTOM_FIELDS.tipoDemanda, value: FIXED_FIELD_VALUES.tipoDemandaRedacao },
+    ],
+  };
+
+  return clickupFetch<ClickUpTask>(`/list/${CLICKUP.listId}/task`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+/** Marca `taskId` como esperando (waiting on) `dependsOnTaskId` no ClickUp. */
+export async function addTaskDependency(taskId: string, dependsOnTaskId: string): Promise<void> {
+  await clickupFetch(`/task/${taskId}/dependency`, {
+    method: "POST",
+    body: JSON.stringify({ depends_on: dependsOnTaskId }),
+  });
+}
+
+/** Anexa um arquivo (ex: roteiro em PDF) a uma task já existente. */
+export async function uploadTaskAttachment(
+  taskId: string,
+  file: Blob,
+  filename: string
+): Promise<void> {
+  const formData = new FormData();
+  formData.append("attachment", file, filename);
+
+  const res = await fetch(`${CLICKUP_API_BASE}/task/${taskId}/attachment`, {
+    method: "POST",
+    headers: { Authorization: getToken() },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`ClickUp API ${res.status} ${res.statusText} ao anexar arquivo: ${body}`);
+  }
+}

@@ -22,6 +22,15 @@ export function buildTaskName({ marca, titulo, inicio }: TaskNameInput): string 
   return `[CAPTAÇÃO] ${marcaPrefix}${titulo} [${dia} ${mes}] - [${periodo}]`;
 }
 
+/**
+ * Monta o nome da task de roteiro pro Zion, quando quem marcou a captação não tem
+ * roteiro pronto: "[ROTEIRO] <Marca> - <Título da captação>".
+ */
+export function buildRoteiroTaskName({ marca, titulo }: { marca: Marca; titulo: string }): string {
+  const marcaPrefix = marca === "Outro" ? "" : `${marca} - `;
+  return `[ROTEIRO] ${marcaPrefix}${titulo}`;
+}
+
 /** Extrai o período do dia a partir do nome de uma task antiga, quando não há hora real disponível. */
 export function guessPeriodoFromTaskName(name: string): "Manhã" | "Tarde" | "Noite" | null {
   const match = name.match(/\[(Manhã|Tarde|Noite)\]\s*$/i);

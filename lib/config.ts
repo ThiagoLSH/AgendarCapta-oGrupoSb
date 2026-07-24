@@ -7,6 +7,7 @@ export const CLICKUP = {
   spaceId: "901310318852", // Shared with me (workspace Quatro5)
   workspaceId: "9013450208",
   thiagoUserId: "112066337", // assignee fixo em toda task de captação
+  zionUserId: "112066340", // assignee fixo na task de roteiro, quando não tem roteiro pronto
 } as const;
 
 export const CUSTOM_FIELDS = {
@@ -19,6 +20,8 @@ export const CUSTOM_FIELDS = {
 export const FIXED_FIELD_VALUES = {
   tarefasSkillCaptacao: "5f1d6dd8-7738-4754-a0b9-a033b8be380b", // "Captação"
   tipoDemandaCaptacao: "bdf2c0b1-8365-4240-aa91-6de7980ff862", // "Captação"
+  tarefasSkillRoteiro: "fb1323e1-b004-440e-8dcd-1a0493b711b8", // "Roteiro de vídeo"
+  tipoDemandaRedacao: "f1bef6de-82d5-41cc-8b56-da1d3e513961", // "Redação"
 } as const;
 
 export type Marca = "SeuBoné" | "Carbone" | "Onevo" | "Weevo" | "Outro";

@@ -18,7 +18,12 @@ ClickUp (comercial, sócios) via link público.
 - `app/page.tsx` (rota `/`) — formulário de criação de captação, página inicial do site.
   Aberto pra qualquer um com o link (sem senha) — só pede o nome da pessoa antes, pra
   preencher o campo "Solicitante" (guardado no navegador via `localStorage`, não precisa
-  digitar de novo).
+  digitar de novo). Título, marca, data/horário, local, solicitante, quem será captado e
+  briefing são obrigatórios. Se "já tem o roteiro pronto?" for "Não", cria automaticamente
+  uma task de roteiro pro Zion (assignee fixo) com o briefing, e marca a captação como
+  dependente dela (`depends_on`) no ClickUp.
+- `app/api/captacoes/[taskId]/anexo` — recebe o roteiro em PDF (multipart) e anexa na
+  task de captação já criada via API do ClickUp.
 - `app/calendario/page.tsx` (rota `/calendario`) — calendário mensal colorido por marca.
   Protegido por senha de gestor — só pede a senha quando alguém clica em "Calendário".
 - `app/nova-captacao/page.tsx` — redirect pra `/`, mantido só por compatibilidade com

@@ -159,11 +159,21 @@ label {
 }
 
 input,
-select {
+select,
+textarea {
   font: inherit;
   padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: 6px;
+  resize: vertical;
+}
+
+input[type="radio"] {
+  width: auto;
+}
+
+label:has(input[type="radio"]) {
+  font-weight: 400;
 }
 
 .form-row {

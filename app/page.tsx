@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MARCAS, SUBMARCAS_BY_MARCA, Marca } from "@/lib/config";
 
 type Prioridade = "urgent" | "high" | "normal" | "low";
@@ -50,7 +50,13 @@ export default function NovaCaptacaoPage() {
   const [horaFim, setHoraFim] = useState("11:00");
   const [local, setLocal] = useState("");
   const [solicitante, setSolicitante] = useState("");
+  const [quemSeraCaptado, setQuemSeraCaptado] = useState("");
+  const [briefing, setBriefing] = useState("");
+  const [roteiroPronto, setRoteiroPronto] = useState<"sim" | "nao" | "">("");
+  const [roteiroTexto, setRoteiroTexto] = useState("");
   const [prioridade, setPrioridade] = useState<Prioridade>("normal");
+
+  const roteiroFileRef = useRef<HTMLInputElement>(null);
 
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{ type: "success" | "error"; message: string } | null>(null);
@@ -70,8 +76,16 @@ export default function NovaCaptacaoPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setSubmitting(true);
     setResult(null);
+
+    const roteiroFile = roteiroFileRef.current?.files?.[0] ?? null;
+
+    if (roteiroPronto === "sim" && !roteiroTexto.trim() && !roteiroFile) {
+      setResult({ type: "error", message: "Informe o roteiro em texto ou anexe um PDF." });
+      return;
+    }
+
+    setSubmitting(true);
 
     try {
       const res = await fetch("/api/captacoes", {
@@ -86,6 +100,11 @@ export default function NovaCaptacaoPage() {
           horaFim,
           local,
           solicitante,
+          quemSeraCaptado,
+          briefing,
+          roteiroPronto: roteiroPronto === "sim",
+          roteiroTexto: roteiroPronto === "sim" ? roteiroTexto : undefined,
+          roteiroTemArquivo: roteiroPronto === "sim" && !!roteiroFile,
           prioridade,
         }),
       });
@@ -93,17 +112,42 @@ export default function NovaCaptacaoPage() {
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? "Erro desconhecido");
 
+      if (roteiroFile) {
+        const formData = new FormData();
+        formData.append("arquivo", roteiroFile);
+        const anexoRes = await fetch(`/api/captacoes/${body.task.id}/anexo`, {
+          method: "POST",
+          body: formData,
+        });
+        if (!anexoRes.ok) {
+          const anexoBody = await anexoRes.json();
+          throw new Error(`Task criada, mas o anexo do roteiro falhou: ${anexoBody.error}`);
+        }
+      }
+
       let message = `Task criada: ${body.task.name} (${body.pontos} pontos).`;
       if (body.precisaConfirmarPontuacao) {
         message += " Duração acima de 4h — confirme a pontuação com a Maria Clara.";
       }
-      const resultType = body.calendarSyncError ? "error" : "success";
+      if (body.roteiroTask) {
+        message += ` Task de roteiro criada para o Zion: ${body.roteiroTask.name}.`;
+      }
+      if (body.roteiroTaskError) {
+        message += ` Atenção: falha ao criar a task de roteiro (${body.roteiroTaskError}).`;
+      }
       if (body.calendarSyncError) {
         message += ` Task criada no ClickUp, mas o evento no Google Calendar falhou (${body.calendarSyncError}) — o próximo sync automático tenta de novo.`;
       }
+      const resultType = body.calendarSyncError || body.roteiroTaskError ? "error" : "success";
       setResult({ type: resultType, message });
+
       setTitulo("");
       setLocal("");
+      setQuemSeraCaptado("");
+      setBriefing("");
+      setRoteiroPronto("");
+      setRoteiroTexto("");
+      if (roteiroFileRef.current) roteiroFileRef.current.value = "";
     } catch (err) {
       setResult({ type: "error", message: err instanceof Error ? err.message : String(err) });
     } finally {
@@ -190,13 +234,87 @@ export default function NovaCaptacaoPage() {
 
         <label>
           Local
-          <input value={local} onChange={(e) => setLocal(e.target.value)} />
+          <input value={local} onChange={(e) => setLocal(e.target.value)} required />
         </label>
 
         <label>
           Solicitante
-          <input value={solicitante} onChange={(e) => setSolicitante(e.target.value)} />
+          <input value={solicitante} onChange={(e) => setSolicitante(e.target.value)} required />
         </label>
+
+        <label>
+          Quem será captado
+          <input
+            value={quemSeraCaptado}
+            onChange={(e) => setQuemSeraCaptado(e.target.value)}
+            placeholder="Nome da pessoa/equipe que aparece no vídeo"
+            required
+          />
+        </label>
+
+        <label>
+          Briefing
+          <textarea
+            value={briefing}
+            onChange={(e) => setBriefing(e.target.value)}
+            rows={5}
+            placeholder="Contexto, objetivo, referências, tom de voz…"
+            required
+          />
+        </label>
+
+        <fieldset style={{ border: "1px solid var(--border)", borderRadius: 6, padding: 12 }}>
+          <legend style={{ fontSize: 13, fontWeight: 600, padding: "0 4px" }}>
+            Já tem o roteiro pronto?
+          </legend>
+          <div className="form-row" style={{ marginBottom: roteiroPronto === "sim" ? 12 : 0 }}>
+            <label style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <input
+                type="radio"
+                name="roteiroPronto"
+                value="sim"
+                checked={roteiroPronto === "sim"}
+                onChange={() => setRoteiroPronto("sim")}
+                required
+              />
+              Sim
+            </label>
+            <label style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <input
+                type="radio"
+                name="roteiroPronto"
+                value="nao"
+                checked={roteiroPronto === "nao"}
+                onChange={() => setRoteiroPronto("nao")}
+              />
+              Não
+            </label>
+          </div>
+
+          {roteiroPronto === "sim" && (
+            <>
+              <label>
+                Roteiro (texto)
+                <textarea
+                  value={roteiroTexto}
+                  onChange={(e) => setRoteiroTexto(e.target.value)}
+                  rows={4}
+                  placeholder="Cole o roteiro aqui, ou anexe um PDF abaixo"
+                />
+              </label>
+              <label>
+                Ou anexar PDF
+                <input type="file" accept="application/pdf" ref={roteiroFileRef} />
+              </label>
+            </>
+          )}
+
+          {roteiroPronto === "nao" && (
+            <p style={{ color: "var(--muted)", fontSize: 13, margin: 0 }}>
+              Vamos criar uma task para o Zion escrever o roteiro com base no briefing acima.
+            </p>
+          )}
+        </fieldset>
 
         <label>
           Prioridade
