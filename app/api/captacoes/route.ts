@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addTaskDependency, createCaptacaoTask, createRoteiroTask } from "@/lib/clickup";
+import {
+  addTaskDependency,
+  addTaskLink,
+  createCaptacaoTask,
+  createEdicaoTask,
+  createRoteiroTask,
+  createTaskComment,
+} from "@/lib/clickup";
 import { buildRoteiroTaskName, buildTaskName } from "@/lib/naming";
-import { Marca, MARCAS, SUBMARCAS_BY_MARCA, pontosFromDuracaoHoras } from "@/lib/config";
+import { Marca, MARCAS, PONTOS_EDICAO_BASE, SUBMARCAS_BY_MARCA, pontosFromDuracaoHoras } from "@/lib/config";
 import { syncSingleTask } from "@/lib/sync";
+import { fortalezaToUtc } from "@/lib/timezone";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -28,7 +36,7 @@ interface CreateCaptacaoBody {
 function parseLocalDateTime(data: string, hora: string): Date {
   const [year, month, day] = data.split("-").map(Number);
   const [hour, minute] = hora.split(":").map(Number);
-  return new Date(year, month - 1, day, hour, minute, 0, 0);
+  return fortalezaToUtc(year, month, day, hour, minute);
 }
 
 export async function POST(req: NextRequest) {
@@ -128,6 +136,37 @@ export async function POST(req: NextRequest) {
       } catch (err) {
         roteiroTaskError = err instanceof Error ? err.message : String(err);
       }
+    }
+
+    // Task de edição pro Klenio, criada em silêncio junto de toda captação — o
+    // solicitante nunca vê nada sobre isso (nem na resposta, nem na UI). Sem data (só
+    // entra na fila), ligada à captação por link cruzado (não por dependência, pra não
+    // travar uma na outra), e avisada no chat da própria task de captação.
+    try {
+      const roteiroInfo = body.roteiroPronto
+        ? body.roteiroTexto
+          ? `Roteiro:\n${body.roteiroTexto}`
+          : "Roteiro: anexado em PDF na task de captação."
+        : "Roteiro: ainda não estava pronto na marcação — ver task de roteiro do Zion, vinculada à captação.";
+
+      const edicaoTask = await createEdicaoTask({
+        name: `[EDIÇÃO] ${body.titulo}`,
+        description: [
+          `Briefing:\n${body.briefing}`,
+          "",
+          roteiroInfo,
+          "",
+          `Captação relacionada: ${task.url}`,
+          "",
+          `Pontuação inicial: ${PONTOS_EDICAO_BASE} pontos (base). Ajustar conforme a complexidade do trabalho de edição.`,
+        ].join("\n"),
+        empresaUuid: body.submarcaUuid,
+        pontos: PONTOS_EDICAO_BASE,
+      });
+      await addTaskLink(task.id, edicaoTask.id);
+      await createTaskComment(task.id, `Task de edição criada automaticamente: ${edicaoTask.url}`);
+    } catch (err) {
+      console.error("Falha ao criar task de edição automática:", err);
     }
 
     let calendarSyncError: string | null = null;

@@ -8,6 +8,7 @@ export const CLICKUP = {
   workspaceId: "9013450208",
   thiagoUserId: "112066337", // assignee fixo em toda task de captação
   zionUserId: "112066340", // assignee fixo na task de roteiro, quando não tem roteiro pronto
+  klenioUserId: "112066326", // assignee fixo na task de edição, criada automaticamente
 } as const;
 
 export const CUSTOM_FIELDS = {
@@ -22,7 +23,12 @@ export const FIXED_FIELD_VALUES = {
   tipoDemandaCaptacao: "bdf2c0b1-8365-4240-aa91-6de7980ff862", // "Captação"
   tarefasSkillRoteiro: "fb1323e1-b004-440e-8dcd-1a0493b711b8", // "Roteiro de vídeo"
   tipoDemandaRedacao: "f1bef6de-82d5-41cc-8b56-da1d3e513961", // "Redação"
+  tarefasSkillEdicao: "a8fdeef1-b907-4444-aec0-b593b7263dc2", // "Edição de vídeo"
+  tipoDemandaEdicao: "fe71b7a7-a593-475e-83a2-b9617782b66e", // "Edição"
 } as const;
+
+/** Pontuação base da task de edição criada automaticamente — ajustar manualmente conforme a complexidade. */
+export const PONTOS_EDICAO_BASE = 3;
 
 export type Marca = "SeuBoné" | "Carbone" | "Onevo" | "Weevo" | "Outro";
 

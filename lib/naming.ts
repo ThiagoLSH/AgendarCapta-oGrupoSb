@@ -1,9 +1,10 @@
 import { MESES_PT, Marca, periodoFromHour } from "./config";
+import { toFortalezaParts } from "./timezone";
 
 export interface TaskNameInput {
   marca: Marca;
   titulo: string;
-  /** Data/hora de início, no fuso local da agenda (America/Fortaleza). */
+  /** Instante absoluto de início — os componentes de data/hora são extraídos no fuso de Fortaleza. */
   inicio: Date;
 }
 
@@ -11,11 +12,13 @@ export interface TaskNameInput {
  * Monta o nome da task no padrão:
  * "[CAPTAÇÃO] <Marca> - <Título> [DD MÊS] - [Período]"
  * A marca é omitida do nome quando for "Outro".
+ * Extrai dia/hora sempre no fuso de Fortaleza, nunca no fuso do servidor.
  */
 export function buildTaskName({ marca, titulo, inicio }: TaskNameInput): string {
-  const dia = String(inicio.getDate()).padStart(2, "0");
-  const mes = MESES_PT[inicio.getMonth()];
-  const periodo = periodoFromHour(inicio.getHours());
+  const { day, month, hour } = toFortalezaParts(inicio);
+  const dia = String(day).padStart(2, "0");
+  const mes = MESES_PT[month];
+  const periodo = periodoFromHour(hour);
 
   const marcaPrefix = marca === "Outro" ? "" : `${marca} - `;
 

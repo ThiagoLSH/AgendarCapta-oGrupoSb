@@ -21,7 +21,14 @@ ClickUp (comercial, sócios) via link público.
   digitar de novo). Título, marca, data/horário, local, solicitante, quem será captado e
   briefing são obrigatórios. Se "já tem o roteiro pronto?" for "Não", cria automaticamente
   uma task de roteiro pro Zion (assignee fixo) com o briefing, e marca a captação como
-  dependente dela (`depends_on`) no ClickUp.
+  dependente dela (`depends_on`) no ClickUp. Também cria, sempre e em silêncio (o
+  solicitante não vê nada disso), uma task `[EDIÇÃO] <título>` pro Klenio — sem data,
+  3 pontos base, linkada (não dependente) à captação e avisada por comentário na task.
+  Campos de telefone (solicitante/captado) existem só visualmente por enquanto, pra uma
+  futura automação via n8n.
+- `lib/timezone.ts` — converte data/hora do formulário (sempre fuso America/Fortaleza)
+  pro instante UTC correto, e vice-versa, sem depender do fuso do processo Node (crítico:
+  na Vercel o servidor roda em UTC, então `new Date(y,m,d,h,min)` puro dá hora errada).
 - `app/api/captacoes/[taskId]/anexo` — recebe o roteiro em PDF (multipart) e anexa na
   task de captação já criada via API do ClickUp.
 - `app/calendario/page.tsx` (rota `/calendario`) — calendário mensal colorido por marca.

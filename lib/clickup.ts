@@ -196,6 +196,52 @@ export async function addTaskDependency(taskId: string, dependsOnTaskId: string)
   });
 }
 
+export interface CreateEdicaoInput {
+  name: string;
+  description: string;
+  empresaUuid: string;
+  pontos: number;
+}
+
+/**
+ * Cria a task de edição pro Klenio, automaticamente junto de toda captação — sem data
+ * (edição não tem horário marcado, só entra na fila). Fica na mesma lista House Quatro5.
+ */
+export async function createEdicaoTask(input: CreateEdicaoInput): Promise<ClickUpTask> {
+  const body = {
+    name: input.name,
+    description: input.description,
+    assignees: [Number(CLICKUP.klenioUserId)],
+    custom_fields: [
+      { id: CUSTOM_FIELDS.empresa, value: [input.empresaUuid] },
+      { id: CUSTOM_FIELDS.tarefasSkill, value: [FIXED_FIELD_VALUES.tarefasSkillEdicao] },
+      { id: CUSTOM_FIELDS.tipoDemanda, value: FIXED_FIELD_VALUES.tipoDemandaEdicao },
+      { id: CUSTOM_FIELDS.pontoAtividadeMkt, value: String(input.pontos) },
+    ],
+  };
+
+  return clickupFetch<ClickUpTask>(`/list/${CLICKUP.listId}/task`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+/**
+ * Cria um link entre duas tasks (referência cruzada, sem bloquear nada — diferente de
+ * dependência). Usado pra ligar a captação à task de edição sem prender uma na outra.
+ */
+export async function addTaskLink(taskId: string, linksToTaskId: string): Promise<void> {
+  await clickupFetch(`/task/${taskId}/link/${linksToTaskId}`, { method: "POST" });
+}
+
+/** Posta um comentário no chat da task (usado pra avisar da task de edição criada). */
+export async function createTaskComment(taskId: string, commentText: string): Promise<void> {
+  await clickupFetch(`/task/${taskId}/comment`, {
+    method: "POST",
+    body: JSON.stringify({ comment_text: commentText, notify_all: false }),
+  });
+}
+
 /** Anexa um arquivo (ex: roteiro em PDF) a uma task já existente. */
 export async function uploadTaskAttachment(
   taskId: string,

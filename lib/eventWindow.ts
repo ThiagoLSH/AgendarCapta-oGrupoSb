@@ -1,6 +1,7 @@
 import { ClickUpTask, getCustomFieldValue } from "./clickup";
 import { CUSTOM_FIELDS, Marca, SUBMARCAS_BY_MARCA } from "./config";
 import { guessPeriodoFromTaskName, PERIODO_HORA_PADRAO } from "./naming";
+import { withFortalezaTime } from "./timezone";
 
 export const UUID_TO_MARCA: Record<string, Marca> = Object.fromEntries(
   (Object.entries(SUBMARCAS_BY_MARCA) as [Marca, { label: string; uuid: string }[]][]).flatMap(
@@ -35,8 +36,7 @@ export function resolveEventWindow(task: ClickUpTask): { start: Date; end: Date 
     const due = new Date(Number(task.due_date));
     const periodo = guessPeriodoFromTaskName(task.name);
     if (periodo) {
-      const start = new Date(due);
-      start.setHours(PERIODO_HORA_PADRAO[periodo], 0, 0, 0);
+      const start = withFortalezaTime(due, PERIODO_HORA_PADRAO[periodo], 0);
       return { start, end: new Date(start.getTime() + DEFAULT_DURATION_MS) };
     }
     return { start: due, end: new Date(due.getTime() + DEFAULT_DURATION_MS) };
