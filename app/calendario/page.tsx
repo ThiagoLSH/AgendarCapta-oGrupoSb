@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import CaptacaoModal from "./CaptacaoModal";
 
 interface CaptacaoEvent {
   id: string;
@@ -40,14 +41,22 @@ function isSameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
+function toInputDate(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export default function CalendarPage() {
   const today = new Date();
   const [cursor, setCursor] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [events, setEvents] = useState<CaptacaoEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [modalDate, setModalDate] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadEvents = useCallback(() => {
     setLoading(true);
     fetch("/api/tasks")
       .then((res) => res.json())
@@ -59,6 +68,10 @@ export default function CalendarPage() {
       .catch((err) => setError(err instanceof Error ? err.message : String(err)))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    loadEvents();
+  }, [loadEvents]);
 
   const days = useMemo(() => buildMonthGrid(cursor.getFullYear(), cursor.getMonth()), [cursor]);
 
@@ -136,8 +149,10 @@ export default function CalendarPage() {
           const hiddenCount = dayEvents.length - visible.length;
           return (
             <div
-              className={`calendar-day${outside ? " outside" : ""}${isToday ? " today" : ""}`}
+              className={`calendar-day clickable${outside ? " outside" : ""}${isToday ? " today" : ""}`}
               key={day.toISOString()}
+              onClick={() => setModalDate(toInputDate(day))}
+              title="Clique para marcar uma captação neste dia"
             >
               <div className={`day-number${isToday ? " today" : ""}`}>{day.getDate()}</div>
               {visible.map((ev) => {
@@ -151,6 +166,7 @@ export default function CalendarPage() {
                     target="_blank"
                     rel="noreferrer"
                     title={`${ev.name} · ${ev.marca ?? "Outro"}`}
+                    onClick={(e) => e.stopPropagation()}
                   >
                     {ev.name}
                   </a>
@@ -161,6 +177,14 @@ export default function CalendarPage() {
           );
         })}
       </div>
+
+      {modalDate && (
+        <CaptacaoModal
+          initialDate={modalDate}
+          onClose={() => setModalDate(null)}
+          onCreated={loadEvents}
+        />
+      )}
     </div>
   );
 }

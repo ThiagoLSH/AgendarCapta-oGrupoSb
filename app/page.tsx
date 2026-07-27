@@ -2,23 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MARCAS, SUBMARCAS_BY_MARCA, Marca } from "@/lib/config";
-
-type Prioridade = "urgent" | "high" | "normal" | "low";
-
-const PRIORIDADE: { value: Prioridade; label: string; color: string }[] = [
-  { value: "urgent", label: "Urgente", color: "#ef4444" },
-  { value: "high", label: "Alta", color: "#f59e0b" },
-  { value: "normal", label: "Normal", color: "#5b8cff" },
-  { value: "low", label: "Baixa", color: "#8a8a96" },
-];
-
-const MARCA_COLOR: Record<Marca, string> = {
-  "SeuBoné": "var(--marca-seubone)",
-  Carbone: "var(--marca-carbone)",
-  Onevo: "var(--marca-onevo)",
-  Weevo: "var(--marca-weevo)",
-  Outro: "var(--marca-outro)",
-};
+import { MARCA_COLOR, PRIORIDADE, Prioridade } from "@/lib/formOptions";
 
 const STEP_LABELS = ["Captação", "Agenda", "Conteúdo"];
 

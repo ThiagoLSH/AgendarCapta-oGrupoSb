@@ -740,3 +740,45 @@ select {
   cursor: pointer;
   font-family: inherit;
 }
+
+.calendar-day.clickable {
+  cursor: pointer;
+}
+
+.calendar-day.clickable:hover {
+  border-color: var(--accent);
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 20px;
+  overflow-y: auto;
+  z-index: 100;
+}
+
+.modal-content {
+  width: 100%;
+  max-width: 640px;
+  margin: auto;
+}
+
+.modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  line-height: 0;
+}
+
+.modal-close:hover {
+  color: var(--text);
+}

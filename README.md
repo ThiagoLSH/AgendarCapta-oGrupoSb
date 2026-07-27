@@ -33,6 +33,11 @@ ClickUp (comercial, sócios) via link público.
   task de captação já criada via API do ClickUp.
 - `app/calendario/page.tsx` (rota `/calendario`) — calendário mensal colorido por marca.
   Protegido por senha de gestor — só pede a senha quando alguém clica em "Calendário".
+  Clicar em qualquer dia abre `CaptacaoModal.tsx`, o mesmo formulário de nova captação
+  (todos os campos numa tela só, sem etapas) com a data já preenchida — pro gestor criar
+  direto pelo calendário, igual ao "clicar num dia" do Google Agenda.
+- `lib/formOptions.ts` — opções de prioridade e cor por marca, compartilhadas entre o
+  formulário principal (`app/page.tsx`) e o modal do calendário.
 - `app/nova-captacao/page.tsx` — redirect pra `/`, mantido só por compatibilidade com
   links antigos já compartilhados.
 - `app/login/page.tsx` — tela de login (nome + senha individual, sem cadastro) só pra ver
