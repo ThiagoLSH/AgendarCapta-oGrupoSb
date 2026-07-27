@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MARCAS, SUBMARCAS_BY_MARCA, Marca } from "@/lib/config";
+import { MARCAS, SUBMARCAS_BY_MARCA, Marca, TIPO_CAPTACAO_OPTIONS, TipoCaptacao } from "@/lib/config";
 import { MARCA_COLOR, PRIORIDADE, Prioridade } from "@/lib/formOptions";
 
 interface CaptacaoModalProps {
@@ -21,6 +21,7 @@ export default function CaptacaoModal({ initialDate, onClose, onCreated }: Capta
   const [solicitante, setSolicitante] = useState("");
   const [quemSeraCaptado, setQuemSeraCaptado] = useState("");
   const [briefing, setBriefing] = useState("");
+  const [tipoCaptacao, setTipoCaptacao] = useState<TipoCaptacao>("video");
   const [roteiroPronto, setRoteiroPronto] = useState<"sim" | "nao" | "">("");
   const [roteiroTexto, setRoteiroTexto] = useState("");
   const [prioridade, setPrioridade] = useState<Prioridade>("normal");
@@ -84,6 +85,7 @@ export default function CaptacaoModal({ initialDate, onClose, onCreated }: Capta
           solicitante,
           quemSeraCaptado,
           briefing,
+          tipoCaptacao,
           roteiroPronto: roteiroPronto === "sim",
           roteiroTexto: roteiroPronto === "sim" ? roteiroTexto : undefined,
           roteiroTemArquivo: roteiroPronto === "sim" && !!roteiroFile,
@@ -216,6 +218,22 @@ export default function CaptacaoModal({ initialDate, onClose, onCreated }: Capta
                 onChange={(e) => setQuemSeraCaptado(e.target.value)}
                 placeholder="Pessoa/equipe no vídeo"
               />
+            </div>
+          </div>
+
+          <div className="field-group">
+            <label>Foto ou vídeo?</label>
+            <div className="pill-group">
+              {TIPO_CAPTACAO_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className={`pill ${tipoCaptacao === opt.value ? "selected" : ""}`}
+                  onClick={() => setTipoCaptacao(opt.value)}
+                >
+                  {opt.label}
+                </button>
+              ))}
             </div>
           </div>
 

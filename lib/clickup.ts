@@ -201,20 +201,27 @@ export interface CreateEdicaoInput {
   description: string;
   empresaUuid: string;
   pontos: number;
+  /** "video" -> Klenio / "Edição de vídeo"; "foto" -> Thiago / "Edição de foto" */
+  tipo: "foto" | "video";
 }
 
 /**
- * Cria a task de edição pro Klenio, automaticamente junto de toda captação — sem data
- * (edição não tem horário marcado, só entra na fila). Fica na mesma lista House Quatro5.
+ * Cria a task de edição, automaticamente junto de toda captação — sem data (edição não
+ * tem horário marcado, só entra na fila). Vídeo vai pro Klenio, foto vai pro Thiago. Fica
+ * na mesma lista House Quatro5.
  */
 export async function createEdicaoTask(input: CreateEdicaoInput): Promise<ClickUpTask> {
+  const assigneeId = input.tipo === "foto" ? CLICKUP.thiagoUserId : CLICKUP.klenioUserId;
+  const skillFieldValue =
+    input.tipo === "foto" ? FIXED_FIELD_VALUES.tarefasSkillEdicaoFoto : FIXED_FIELD_VALUES.tarefasSkillEdicaoVideo;
+
   const body = {
     name: input.name,
     description: input.description,
-    assignees: [Number(CLICKUP.klenioUserId)],
+    assignees: [Number(assigneeId)],
     custom_fields: [
       { id: CUSTOM_FIELDS.empresa, value: [input.empresaUuid] },
-      { id: CUSTOM_FIELDS.tarefasSkill, value: [FIXED_FIELD_VALUES.tarefasSkillEdicao] },
+      { id: CUSTOM_FIELDS.tarefasSkill, value: [skillFieldValue] },
       { id: CUSTOM_FIELDS.tipoDemanda, value: FIXED_FIELD_VALUES.tipoDemandaEdicao },
       { id: CUSTOM_FIELDS.pontoAtividadeMkt, value: String(input.pontos) },
     ],

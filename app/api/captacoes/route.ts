@@ -8,7 +8,14 @@ import {
   createTaskComment,
 } from "@/lib/clickup";
 import { buildRoteiroTaskName, buildTaskName } from "@/lib/naming";
-import { Marca, MARCAS, PONTOS_EDICAO_BASE, SUBMARCAS_BY_MARCA, pontosFromDuracaoHoras } from "@/lib/config";
+import {
+  Marca,
+  MARCAS,
+  PONTOS_EDICAO_BASE,
+  SUBMARCAS_BY_MARCA,
+  TipoCaptacao,
+  pontosFromDuracaoHoras,
+} from "@/lib/config";
 import { syncSingleTask } from "@/lib/sync";
 import { fortalezaToUtc } from "@/lib/timezone";
 
@@ -26,6 +33,7 @@ interface CreateCaptacaoBody {
   solicitante: string;
   quemSeraCaptado: string;
   briefing: string;
+  tipoCaptacao: TipoCaptacao;
   roteiroPronto: boolean;
   roteiroTexto?: string;
   /** true quando um PDF será enviado logo em seguida via /api/captacoes/[taskId]/anexo */
@@ -58,6 +66,7 @@ export async function POST(req: NextRequest) {
     "solicitante",
     "quemSeraCaptado",
     "briefing",
+    "tipoCaptacao",
   ];
   const faltando = camposObrigatorios.filter((campo) => !body[campo]);
   if (faltando.length > 0 || typeof body.roteiroPronto !== "boolean") {
@@ -65,6 +74,10 @@ export async function POST(req: NextRequest) {
       { error: `Campos obrigatórios ausentes: ${faltando.join(", ") || "roteiroPronto"}` },
       { status: 400 }
     );
+  }
+
+  if (!["foto", "video", "ambos"].includes(body.tipoCaptacao)) {
+    return NextResponse.json({ error: `Tipo de captação inválido: ${body.tipoCaptacao}` }, { status: 400 });
   }
 
   if (body.roteiroPronto && !body.roteiroTexto && !body.roteiroTemArquivo) {
@@ -138,10 +151,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Task de edição pro Klenio, criada em silêncio junto de toda captação — o
-    // solicitante nunca vê nada sobre isso (nem na resposta, nem na UI). Sem data (só
-    // entra na fila), ligada à captação por link cruzado (não por dependência, pra não
-    // travar uma na outra), e avisada no chat da própria task de captação.
+    // Task(s) de edição, criadas em silêncio junto de toda captação — o solicitante nunca
+    // vê nada sobre isso (nem na resposta, nem na UI). Vídeo vai pro Klenio, foto vai pro
+    // Thiago; se for "ambos", cria uma task de cada. Sem data (só entra na fila), ligada
+    // à captação por link cruzado (não por dependência, pra não travar uma na outra), e
+    // avisada no chat da própria task de captação.
     try {
       const roteiroInfo = body.roteiroPronto
         ? body.roteiroTexto
@@ -149,24 +163,31 @@ export async function POST(req: NextRequest) {
           : "Roteiro: anexado em PDF na task de captação."
         : "Roteiro: ainda não estava pronto na marcação — ver task de roteiro do Zion, vinculada à captação.";
 
-      const edicaoTask = await createEdicaoTask({
-        name: `[EDIÇÃO] ${body.titulo}`,
-        description: [
-          `Briefing:\n${body.briefing}`,
-          "",
-          roteiroInfo,
-          "",
-          `Captação relacionada: ${task.url}`,
-          "",
-          `Pontuação inicial: ${PONTOS_EDICAO_BASE} pontos (base). Ajustar conforme a complexidade do trabalho de edição.`,
-        ].join("\n"),
-        empresaUuid: body.submarcaUuid,
-        pontos: PONTOS_EDICAO_BASE,
-      });
-      await addTaskLink(task.id, edicaoTask.id);
-      await createTaskComment(task.id, `Task de edição criada automaticamente: ${edicaoTask.url}`);
+      const tiposEdicao: ("foto" | "video")[] =
+        body.tipoCaptacao === "ambos" ? ["video", "foto"] : [body.tipoCaptacao];
+
+      for (const tipo of tiposEdicao) {
+        const label = tipo === "foto" ? "FOTO" : "VÍDEO";
+        const edicaoTask = await createEdicaoTask({
+          name: `[EDIÇÃO DE ${label}] ${body.titulo}`,
+          description: [
+            `Briefing:\n${body.briefing}`,
+            "",
+            roteiroInfo,
+            "",
+            `Captação relacionada: ${task.url}`,
+            "",
+            `Pontuação inicial: ${PONTOS_EDICAO_BASE} pontos (base). Ajustar conforme a complexidade do trabalho de edição.`,
+          ].join("\n"),
+          empresaUuid: body.submarcaUuid,
+          pontos: PONTOS_EDICAO_BASE,
+          tipo,
+        });
+        await addTaskLink(task.id, edicaoTask.id);
+        await createTaskComment(task.id, `Task de edição criada automaticamente: ${edicaoTask.url}`);
+      }
     } catch (err) {
-      console.error("Falha ao criar task de edição automática:", err);
+      console.error("Falha ao criar task(s) de edição automática:", err);
     }
 
     let calendarSyncError: string | null = null;

@@ -6,9 +6,9 @@ export const CLICKUP = {
   folderId: "901313343285", // MKT
   spaceId: "901310318852", // Shared with me (workspace Quatro5)
   workspaceId: "9013450208",
-  thiagoUserId: "112066337", // assignee fixo em toda task de captação
+  thiagoUserId: "112066337", // assignee fixo em toda task de captação, e na task de edição de foto
   zionUserId: "112066340", // assignee fixo na task de roteiro, quando não tem roteiro pronto
-  klenioUserId: "112066326", // assignee fixo na task de edição, criada automaticamente
+  klenioUserId: "112066326", // assignee fixo na task de edição de vídeo, criada automaticamente
 } as const;
 
 export const CUSTOM_FIELDS = {
@@ -23,12 +23,21 @@ export const FIXED_FIELD_VALUES = {
   tipoDemandaCaptacao: "bdf2c0b1-8365-4240-aa91-6de7980ff862", // "Captação"
   tarefasSkillRoteiro: "fb1323e1-b004-440e-8dcd-1a0493b711b8", // "Roteiro de vídeo"
   tipoDemandaRedacao: "f1bef6de-82d5-41cc-8b56-da1d3e513961", // "Redação"
-  tarefasSkillEdicao: "a8fdeef1-b907-4444-aec0-b593b7263dc2", // "Edição de vídeo"
+  tarefasSkillEdicaoVideo: "a8fdeef1-b907-4444-aec0-b593b7263dc2", // "Edição de vídeo"
+  tarefasSkillEdicaoFoto: "17f26380-9104-4ac1-8266-d8c8d6ee4f72", // "Edição de foto"
   tipoDemandaEdicao: "fe71b7a7-a593-475e-83a2-b9617782b66e", // "Edição"
 } as const;
 
 /** Pontuação base da task de edição criada automaticamente — ajustar manualmente conforme a complexidade. */
 export const PONTOS_EDICAO_BASE = 3;
+
+export type TipoCaptacao = "foto" | "video" | "ambos";
+
+export const TIPO_CAPTACAO_OPTIONS: { value: TipoCaptacao; label: string }[] = [
+  { value: "video", label: "Vídeo" },
+  { value: "foto", label: "Foto" },
+  { value: "ambos", label: "Foto e vídeo" },
+];
 
 export type Marca = "SeuBoné" | "Carbone" | "Onevo" | "Weevo" | "Outro";
 

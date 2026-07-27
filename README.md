@@ -18,14 +18,16 @@ ClickUp (comercial, sócios) via link público.
 - `app/page.tsx` (rota `/`) — formulário de criação de captação, página inicial do site.
   Aberto pra qualquer um com o link (sem senha) — só pede o nome da pessoa antes, pra
   preencher o campo "Solicitante" (guardado no navegador via `localStorage`, não precisa
-  digitar de novo). Título, marca, data/horário, local, solicitante, quem será captado e
-  briefing são obrigatórios. Se "já tem o roteiro pronto?" for "Não", cria automaticamente
-  uma task de roteiro pro Zion (assignee fixo) com o briefing, e marca a captação como
-  dependente dela (`depends_on`) no ClickUp. Também cria, sempre e em silêncio (o
-  solicitante não vê nada disso), uma task `[EDIÇÃO] <título>` pro Klenio — sem data,
-  3 pontos base, linkada (não dependente) à captação e avisada por comentário na task.
-  Campos de telefone (solicitante/captado) existem só visualmente por enquanto, pra uma
-  futura automação via n8n.
+  digitar de novo). Título, marca, data/horário, local, solicitante, quem será captado,
+  briefing e o tipo (foto, vídeo ou os dois) são obrigatórios. Se "já tem o roteiro
+  pronto?" for "Não", cria automaticamente uma task de roteiro pro Zion (assignee fixo)
+  com o briefing, e marca a captação como dependente dela (`depends_on`) no ClickUp.
+  Também cria, sempre e em silêncio (o solicitante não vê nada disso), a(s) task(s) de
+  edição — sem data, 3 pontos base cada, linkada (não dependente) à captação e avisada
+  por comentário na task: `[EDIÇÃO DE VÍDEO] <título>` pro Klenio quando o tipo é vídeo,
+  `[EDIÇÃO DE FOTO] <título>` pro Thiago quando o tipo é foto, e as duas quando o tipo é
+  "foto e vídeo". Campos de telefone (solicitante/captado) existem só visualmente por
+  enquanto, pra uma futura automação via n8n.
 - `lib/timezone.ts` — converte data/hora do formulário (sempre fuso America/Fortaleza)
   pro instante UTC correto, e vice-versa, sem depender do fuso do processo Node (crítico:
   na Vercel o servidor roda em UTC, então `new Date(y,m,d,h,min)` puro dá hora errada).
