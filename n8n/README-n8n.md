@@ -49,9 +49,12 @@ Depois de importar os workflows, cada node HTTP Request/Google Sheets vai pedir 
 você selecionar a credencial certa (o JSON só referencia o nome, o segredo não viaja
 nele).
 
-## 3. Planilha Google "Contatos de Captação"
+## 3. Planilha Google "Contatos de Captação" ✅ já criada
 
-Criar uma planilha com 2 abas:
+Planilha: [Contatos de Captação — Agenda SB](https://docs.google.com/spreadsheets/d/1tYkmBMk2A6Gpw6rJtCpT_bQeC-k2X1QtNVivJf0VkmU/edit)
+— compartilhada com a service account (`agenda-captacao-sync@grupo-sb-agenda.iam.gserviceaccount.com`),
+já com as 2 abas e cabeçalhos prontos, e o ID já preenchido em `googleSheetsSpreadsheetId`
+nos dois workflows:
 
 - **"Contatos de Captação"** — colunas: `Telefone`, `Nome`, `Já Recebeu Apresentação`
   (`sim`/vazio), `Data da Primeira Captação`. Controla quem já recebeu a mensagem de
@@ -59,8 +62,14 @@ Criar uma planilha com 2 abas:
 - **"Log"** — colunas: `Timestamp`, `Telefone`, `Tipo`, `Mensagem`, `TaskId`, `Status`.
   Log de auditoria de toda mensagem mandada (os dois workflows escrevem aqui).
 
-Cole o ID da planilha (da URL) em `googleSheetsSpreadsheetId` no node CONFIG dos dois
-workflows.
+Como a planilha foi compartilhada com a **mesma service account** que já sincroniza o
+Google Calendar (em vez de criada por ela — service account avulsa não consegue criar
+arquivo próprio no Drive), a credencial do n8n pode reaproveitar esse mesmo par
+e-mail/chave: no node Google Sheets, use o método de autenticação **Service Account**
+(não OAuth2) com `GOOGLE_SERVICE_ACCOUNT_EMAIL` e `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`
+(os mesmos valores do `.env.local` do site). Se o n8n de vocês só tiver a opção OAuth2
+pro node Google Sheets, aí sim crie uma credencial OAuth2 normal autorizando a conta
+Google que já é dona/editora da planilha.
 
 ## 4. Valores que só você tem
 
