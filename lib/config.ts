@@ -23,11 +23,10 @@ export const CUSTOM_FIELDS = {
   tarefasSkill: "036acdcf-df5a-4a6f-a944-3845236cd64a", // labels
   tipoDemanda: "29cf0a36-6192-4ce0-a678-991bc3701269", // dropdown
   pontoAtividadeMkt: "0f939433-f3b1-493c-9212-731c3ad2da15", // number, obrigatório
-  // Campos de texto criados manualmente no ClickUp (a API não cria campo novo) para o
-  // fluxo de confirmação/lembrete via WhatsApp (n8n). Preencher o UUID real aqui assim
-  // que o campo existir na lista House Quatro5 — até lá fica de fora do payload.
-  telefoneSolicitante: "", // texto, formato "+55 84 9 9999-9999"
-  telefoneCaptado: "", // texto, formato "+55 84 9 9999-9999"
+  // Campos criados manualmente no ClickUp (a API não cria campo novo) para o fluxo de
+  // confirmação/lembrete via WhatsApp (n8n).
+  telefoneSolicitante: "", // ainda não criado — resolvido via descrição da task, não custom field
+  telefoneCaptado: "ec822183-eb29-4434-9dd3-4c36276135ea", // "Whatsapp Captado", tipo phone
 } as const;
 
 export const FIXED_FIELD_VALUES = {

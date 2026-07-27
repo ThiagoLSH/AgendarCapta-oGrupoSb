@@ -10,12 +10,10 @@ Dois workflows, pra importar no n8n self-hosted:
 Não mexe na sincronização ClickUp → Google Agenda que já existe — isso aqui é só
 mensageria.
 
-## 1. O que criar manualmente no ClickUp (a API não cria campo novo)
+## 1. Campos no ClickUp ✅ já criados e ligados
 
-Na lista "House Quatro5", criar 2 campos customizados de texto:
-
-- **"Estágio do lembrete"** — number (ou dropdown com as opções 0/1/2/3/4). Controla o
-  que já foi mandado pra cada captação, pra nunca duplicar:
+- **"Estágio do lembrete"** (number) — `d898626d-ae5a-4d4f-89c4-5e75f8a74f1e`. Controla
+  o que já foi mandado pra cada captação, pra nunca duplicar:
   - `0` = nada enviado ainda
   - `1` = confirmação enviada
   - `2` = lembrete de 1 dia enviado
@@ -23,13 +21,12 @@ Na lista "House Quatro5", criar 2 campos customizados de texto:
   - `4` = lembrete de 30min enviado
   - (esse contador junta a confirmação inicial com os 3 lembretes do pedido original,
     numa sequência só — mais simples de controlar que dois campos separados)
-- **"WhatsApp do captado"** — texto. Esse é o **mesmo campo** que o site já está
-  preparado pra preencher (`lib/config.ts`, chave `telefoneCaptado`) — depois de criar
-  aqui, me manda o UUID que eu já ligo no site e o formulário passa a mandar de verdade.
+- **"Whatsapp Captado"** (tipo `phone`) — `ec822183-eb29-4434-9dd3-4c36276135ea`. Testado
+  de ponta a ponta: o site já grava o telefone nesse campo (`lib/config.ts`, chave
+  `telefoneCaptado`) e os dois workflows já apontam pro mesmo UUID.
 
-Depois de criar os dois, pegue os UUIDs (ClickUp mostra ao passar o mouse / inspecionar
-o campo, ou via `GET /list/901321051391/field`) e cole no node **CONFIG** de cada
-workflow (`fieldEstagioLembrete`, `fieldTelefoneCaptado`).
+Os dois UUIDs já estão preenchidos no node **CONFIG** dos dois workflows — não precisa
+mexer em nada aqui.
 
 O campo **"WhatsApp do solicitante"** eu decidi resolver como campo do formulário
 mesmo (não um cadastro à parte) — já está funcional no site, gravado na *descrição* da
