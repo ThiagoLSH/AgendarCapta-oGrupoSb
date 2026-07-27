@@ -61,6 +61,8 @@ export interface CreateCaptacaoInput {
   empresaUuid: string;
   pontos: number;
   priority: "urgent" | "high" | "normal" | "low";
+  telefoneSolicitante?: string;
+  telefoneCaptado?: string;
 }
 
 const PRIORITY_MAP: Record<CreateCaptacaoInput["priority"], number> = {
@@ -72,6 +74,21 @@ const PRIORITY_MAP: Record<CreateCaptacaoInput["priority"], number> = {
 
 /** Cria uma task de captação na lista House Quatro5 com todos os campos de negócio já preenchidos. */
 export async function createCaptacaoTask(input: CreateCaptacaoInput): Promise<ClickUpTask> {
+  const customFields: ClickUpCustomFieldValue[] = [
+    { id: CUSTOM_FIELDS.empresa, value: [input.empresaUuid] },
+    { id: CUSTOM_FIELDS.tarefasSkill, value: [FIXED_FIELD_VALUES.tarefasSkillCaptacao] },
+    { id: CUSTOM_FIELDS.tipoDemanda, value: FIXED_FIELD_VALUES.tipoDemandaCaptacao },
+    { id: CUSTOM_FIELDS.pontoAtividadeMkt, value: String(input.pontos) },
+  ];
+  // Só entram no payload depois que o campo correspondente existir de verdade no ClickUp
+  // (UUID preenchido em lib/config.ts) — usados pelo fluxo de WhatsApp (n8n).
+  if (CUSTOM_FIELDS.telefoneSolicitante && input.telefoneSolicitante) {
+    customFields.push({ id: CUSTOM_FIELDS.telefoneSolicitante, value: input.telefoneSolicitante });
+  }
+  if (CUSTOM_FIELDS.telefoneCaptado && input.telefoneCaptado) {
+    customFields.push({ id: CUSTOM_FIELDS.telefoneCaptado, value: input.telefoneCaptado });
+  }
+
   const body = {
     name: input.name,
     description: input.description ?? "",
@@ -81,12 +98,7 @@ export async function createCaptacaoTask(input: CreateCaptacaoInput): Promise<Cl
     start_date_time: true,
     due_date: input.dueDateMs,
     due_date_time: true,
-    custom_fields: [
-      { id: CUSTOM_FIELDS.empresa, value: [input.empresaUuid] },
-      { id: CUSTOM_FIELDS.tarefasSkill, value: [FIXED_FIELD_VALUES.tarefasSkillCaptacao] },
-      { id: CUSTOM_FIELDS.tipoDemanda, value: FIXED_FIELD_VALUES.tipoDemandaCaptacao },
-      { id: CUSTOM_FIELDS.pontoAtividadeMkt, value: String(input.pontos) },
-    ],
+    custom_fields: customFields,
   };
 
   return clickupFetch<ClickUpTask>(`/list/${CLICKUP.listId}/task`, {

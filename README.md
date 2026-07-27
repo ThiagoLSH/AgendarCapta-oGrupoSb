@@ -98,6 +98,16 @@ ClickUp (comercial, sócios) via link público.
   `*/15 * * * *` e o cron nativo assume sozinho.
 - Alternativa sem Vercel: rodar `npm run sync:once` via cron do próprio servidor/Railway.
 
+## Confirmação e lembrete via WhatsApp (n8n)
+
+- Fluxo separado, self-hosted, fora deste projeto Next.js — arquivos em `n8n/`
+  (workflows prontos pra importar + `n8n/README-n8n.md` com o passo a passo de
+  configuração: campos novos a criar no ClickUp, credenciais, planilha de contatos).
+- O site só entra aqui fornecendo os telefones (campos "Telefone do solicitante" e
+  "Telefone de quem será captado" no formulário — ver `lib/config.ts`, chaves
+  `telefoneSolicitante`/`telefoneCaptado`, que ficam de fora do payload até os campos
+  correspondentes existirem de verdade no ClickUp).
+
 ## Pendências conhecidas (ver contexto completo no prompt original)
 
 - Pontuação para captações acima de 4h ainda não tem tabela oficial — confirmar com a

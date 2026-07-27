@@ -31,7 +31,9 @@ interface CreateCaptacaoBody {
   horaFim: string; // "HH:mm"
   local: string;
   solicitante: string;
+  telefoneSolicitante?: string;
   quemSeraCaptado: string;
+  telefoneCaptado?: string;
   briefing: string;
   tipoCaptacao: TipoCaptacao;
   roteiroPronto: boolean;
@@ -111,7 +113,9 @@ export async function POST(req: NextRequest) {
   const descriptionLines = [
     `Local: ${body.local}`,
     `Solicitante: ${body.solicitante}`,
+    body.telefoneSolicitante ? `WhatsApp do solicitante: ${body.telefoneSolicitante}` : null,
     `Quem será captado: ${body.quemSeraCaptado}`,
+    body.telefoneCaptado ? `WhatsApp de quem será captado: ${body.telefoneCaptado}` : null,
     "",
     "Briefing:",
     body.briefing,
@@ -132,6 +136,8 @@ export async function POST(req: NextRequest) {
       empresaUuid: body.submarcaUuid,
       pontos,
       priority: body.prioridade,
+      telefoneSolicitante: body.telefoneSolicitante,
+      telefoneCaptado: body.telefoneCaptado,
     });
 
     let roteiroTask: { id: string; name: string; url: string } | null = null;

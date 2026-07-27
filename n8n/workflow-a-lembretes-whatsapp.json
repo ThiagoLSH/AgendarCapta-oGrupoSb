@@ -1,0 +1,248 @@
+{
+  "name": "SB Captação — Confirmação e Lembretes WhatsApp",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "minutes", "minutesInterval": 15 }
+          ]
+        }
+      },
+      "id": "trigger-schedule",
+      "name": "A cada 15 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// ===== CONFIG — edite os valores abaixo antes de ativar o workflow =====\nreturn [{\n  json: {\n    clickupBaseUrl: \"https://api.clickup.com/api/v2\",\n    clickupListId: \"901321051391\",\n\n    // Campos já existentes no ClickUp (não mexer)\n    fieldTarefasSkill: \"036acdcf-df5a-4a6f-a944-3845236cd64a\",\n    valorSkillCaptacao: \"5f1d6dd8-7738-4754-a0b9-a033b8be380b\",\n    fieldNomeCaptado: \"5eac4259-559b-4faa-bae0-b5d544a1a040\",\n\n    // Campos NOVOS — criar manualmente no ClickUp (lista House Quatro5) e colar o UUID aqui.\n    // \"Estágio do lembrete\": tipo number ou dropdown, valores 0 a 4 (ver README-n8n.md).\n    fieldEstagioLembrete: \"PREENCHER_UUID_ESTAGIO_LEMBRETE\",\n    // \"WhatsApp do captado\": tipo texto — o mesmo UUID usado em lib/config.ts do site.\n    fieldTelefoneCaptado: \"PREENCHER_UUID_TELEFONE_CAPTADO\",\n\n    // UAZAPI\n    uazapiBaseUrl: \"https://SEU-DOMINIO.uazapi.com\",\n\n    // Planilha Google \"Contatos de Captação\" (colunas: Telefone, Nome, Já Recebeu Apresentação, Data da Primeira Captação)\n    googleSheetsSpreadsheetId: \"PREENCHER_ID_DA_PLANILHA\",\n    googleSheetsContatosTab: \"Contatos de Captação\",\n    googleSheetsLogTab: \"Log\"\n  }\n}];"
+      },
+      "id": "code-config",
+      "name": "CONFIG",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.clickupBaseUrl }}/list/{{ $json.clickupListId }}/task",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "include_closed", "value": "false" },
+            { "name": "subtasks", "value": "true" },
+            {
+              "name": "custom_fields",
+              "value": "={{ JSON.stringify([{ field_id: $json.fieldTarefasSkill, operator: 'ANY', value: [$json.valorSkillCaptacao] }]) }}"
+            }
+          ]
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "http-buscar-captacoes",
+      "name": "ClickUp: Buscar Captações",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, -100],
+      "credentials": {
+        "httpHeaderAuth": { "id": "PREENCHER", "name": "ClickUp Token" }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": { "mode": "id", "value": "={{ $('CONFIG').first().json.googleSheetsSpreadsheetId }}" },
+        "sheetName": { "mode": "name", "value": "={{ $('CONFIG').first().json.googleSheetsContatosTab }}" },
+        "options": {}
+      },
+      "id": "sheets-ler-contatos",
+      "name": "Ler Contatos",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [440, 100],
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "PREENCHER", "name": "Google Sheets — Captação" }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": { "mode": "append" },
+      "id": "merge-aguardar",
+      "name": "Aguardar ambos",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Cruza as captações do ClickUp com o estágio de lembrete de cada uma, decide se\n// precisa mandar confirmação/lembrete agora, e monta o(s) texto(s) da mensagem.\n// \"Estágio do lembrete\": 0 nada / 1 confirmação enviada / 2 lembrete 1 dia / 3 lembrete 2h / 4 lembrete 30min\n// (extensão do rascunho original — a confirmação inicial também usa esse contador, como estágio 1)\nconst config = $('CONFIG').first().json;\nconst clickupResp = $('ClickUp: Buscar Captações').first().json;\nconst tasks = clickupResp.tasks || [];\nconst contatos = $('Ler Contatos').all().map(i => i.json);\nconst nowMs = Date.now();\nconst MESES = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];\n\nfunction getCF(task, fieldId) {\n  if (!fieldId) return null;\n  const cf = (task.custom_fields || []).find(f => f.id === fieldId);\n  return cf ? cf.value : null;\n}\nfunction parseDescField(desc, label) {\n  const re = new RegExp('^' + label + ':\\\\s*(.+)$', 'm');\n  const m = (desc || '').match(re);\n  return m ? m[1].trim() : '';\n}\nfunction toFortaleza(ms) {\n  const shifted = new Date(ms - 3 * 60 * 60 * 1000);\n  return {\n    dia: String(shifted.getUTCDate()).padStart(2, '0'),\n    mesLabel: MESES[shifted.getUTCMonth()],\n    hora: String(shifted.getUTCHours()).padStart(2, '0'),\n    minuto: String(shifted.getUTCMinutes()).padStart(2, '0'),\n  };\n}\n\nconst results = [];\n\nfor (const task of tasks) {\n  if (!task.start_date) continue;\n  const startMs = Number(task.start_date);\n  const diffMin = (startMs - nowMs) / 60000;\n  if (diffMin < -15) continue; // já passou (com folga de 1 ciclo do poll) — não manda mais nada\n\n  const estagioRaw = getCF(task, config.fieldEstagioLembrete);\n  const estagio = estagioRaw != null && estagioRaw !== '' ? Number(estagioRaw) : 0;\n\n  let novoEstagio = null;\n  let tipoMensagem = null;\n  if (estagio < 1) {\n    novoEstagio = 1; tipoMensagem = 'confirmacao';\n  } else if (estagio < 2 && diffMin <= 24 * 60) {\n    novoEstagio = 2; tipoMensagem = 'lembrete_1dia';\n  } else if (estagio < 3 && diffMin <= 120) {\n    novoEstagio = 3; tipoMensagem = 'lembrete_2h';\n  } else if (estagio < 4 && diffMin <= 30) {\n    novoEstagio = 4; tipoMensagem = 'lembrete_30min';\n  }\n  if (!tipoMensagem) continue; // ainda não é hora de nada pra essa captação\n\n  const telefoneRaw = getCF(task, config.fieldTelefoneCaptado);\n  if (!telefoneRaw) continue; // sem WhatsApp cadastrado na task — não dá pra mandar (avaliar log manual)\n  const telefone = String(telefoneRaw).replace(/\\D/g, '');\n\n  const nomeCaptado = (getCF(task, config.fieldNomeCaptado) || '').toString().trim() || 'tudo bem';\n  const marcaMatch = (task.name || '').match(/^\\[CAPTAÇÃO\\]\\s*([^-]+?)\\s*-/);\n  const marca = marcaMatch ? marcaMatch[1].trim() : '';\n  const desc = task.text_content || task.description || '';\n  const local = parseDescField(desc, 'Local') || 'local a confirmar';\n  const { dia, mesLabel, hora, minuto } = toFortaleza(startMs);\n  const dataFmt = `${dia} ${mesLabel}`;\n  const horaFmt = `${hora}:${minuto}`;\n\n  const textos = {\n    confirmacao: `Oi, ${nomeCaptado}! Sua captação para ${marca} está marcada: ${dataFmt} às ${horaFmt}, em ${local}. Se precisar remarcar, responda \"Adiar captação\" com pelo menos 1h de antecedência.`,\n    lembrete_1dia: `Lembrete: sua captação (${marca}) é amanhã, ${dataFmt}, às ${horaFmt}, em ${local}.`,\n    lembrete_2h: `Sua captação (${marca}) é daqui a 2 horas, às ${horaFmt}, em ${local}.`,\n    lembrete_30min: `Sua captação (${marca}) começa em 30 minutos, em ${local}. Já pode ir chegando.`,\n  };\n\n  const contato = contatos.find(c => String(c.Telefone || '').replace(/\\D/g, '') === telefone);\n  const jaRecebeuApresentacao = contato && String(contato['Já Recebeu Apresentação'] || '').toLowerCase().trim() === 'sim';\n\n  const mensagens = [];\n  if (!jaRecebeuApresentacao) {\n    mensagens.push('Oi! Aqui é o assistente de captação do Grupo SB. A partir de agora você vai receber por aqui a confirmação e os lembretes das suas gravações. Qualquer dúvida, é só responder essa mensagem.');\n  }\n  mensagens.push(textos[tipoMensagem]);\n\n  results.push({\n    json: {\n      taskId: task.id,\n      telefone,\n      nomeCaptado,\n      tipoMensagem,\n      novoEstagio,\n      mensagens,\n      precisaMarcarApresentacao: !jaRecebeuApresentacao,\n      dataFmt,\n    }\n  });\n}\n\nreturn results;"
+      },
+      "id": "code-montar-acoes",
+      "name": "Montar ações e mensagens",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 0]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "mensagens",
+        "options": { "destinationFieldName": "mensagens" }
+      },
+      "id": "splitout-mensagens",
+      "name": "Uma linha por mensagem",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [1100, -100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('CONFIG').first().json.uazapiBaseUrl }}/send/text",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ number: $json.telefone, text: $json.mensagens }) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "http-enviar-mensagem",
+      "name": "UAZAPI: Enviar Mensagem",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1320, -100],
+      "credentials": {
+        "httpHeaderAuth": { "id": "PREENCHER", "name": "UAZAPI Token" }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "mode": "id", "value": "={{ $('CONFIG').first().json.googleSheetsSpreadsheetId }}" },
+        "sheetName": { "mode": "name", "value": "={{ $('CONFIG').first().json.googleSheetsLogTab }}" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ new Date().toISOString() }}",
+            "Telefone": "={{ $json.telefone }}",
+            "Tipo": "={{ $json.tipoMensagem || 'mensagem' }}",
+            "Mensagem": "={{ $json.mensagens }}",
+            "TaskId": "={{ $json.taskId }}",
+            "Status": "={{ $json.error ? 'erro' : 'enviado' }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "sheets-log-envio",
+      "name": "Log de Envio",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1540, -100],
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "PREENCHER", "name": "Google Sheets — Captação" }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('CONFIG').first().json.clickupBaseUrl }}/task/{{ $json.taskId }}/field/{{ $('CONFIG').first().json.fieldEstagioLembrete }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ value: $json.novoEstagio }) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "http-atualizar-estagio",
+      "name": "ClickUp: Atualizar Estágio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 120],
+      "credentials": {
+        "httpHeaderAuth": { "id": "PREENCHER", "name": "ClickUp Token" }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.precisaMarcarApresentacao }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ]
+        }
+      },
+      "id": "if-precisa-marcar",
+      "name": "Precisa marcar apresentação?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1320, 120]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": { "mode": "id", "value": "={{ $('CONFIG').first().json.googleSheetsSpreadsheetId }}" },
+        "sheetName": { "mode": "name", "value": "={{ $('CONFIG').first().json.googleSheetsContatosTab }}" },
+        "columnToMatchOn": "Telefone",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Telefone": "={{ $json.telefone }}",
+            "Nome": "={{ $json.nomeCaptado }}",
+            "Já Recebeu Apresentação": "sim",
+            "Data da Primeira Captação": "={{ $json.dataFmt }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "sheets-atualizar-contato",
+      "name": "Atualizar Contato",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1540, 120],
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "PREENCHER", "name": "Google Sheets — Captação" }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "A cada 15 min": { "main": [[{ "node": "CONFIG", "type": "main", "index": 0 }]] },
+    "CONFIG": {
+      "main": [[
+        { "node": "ClickUp: Buscar Captações", "type": "main", "index": 0 },
+        { "node": "Ler Contatos", "type": "main", "index": 0 }
+      ]]
+    },
+    "ClickUp: Buscar Captações": { "main": [[{ "node": "Aguardar ambos", "type": "main", "index": 0 }]] },
+    "Ler Contatos": { "main": [[{ "node": "Aguardar ambos", "type": "main", "index": 1 }]] },
+    "Aguardar ambos": { "main": [[{ "node": "Montar ações e mensagens", "type": "main", "index": 0 }]] },
+    "Montar ações e mensagens": {
+      "main": [[
+        { "node": "Uma linha por mensagem", "type": "main", "index": 0 },
+        { "node": "ClickUp: Atualizar Estágio", "type": "main", "index": 0 }
+      ]]
+    },
+    "Uma linha por mensagem": { "main": [[{ "node": "UAZAPI: Enviar Mensagem", "type": "main", "index": 0 }]] },
+    "UAZAPI: Enviar Mensagem": { "main": [[{ "node": "Log de Envio", "type": "main", "index": 0 }]] },
+    "ClickUp: Atualizar Estágio": { "main": [[{ "node": "Precisa marcar apresentação?", "type": "main", "index": 0 }]] },
+    "Precisa marcar apresentação?": { "main": [[{ "node": "Atualizar Contato", "type": "main", "index": 0 }], []] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "pinData": {}
+}

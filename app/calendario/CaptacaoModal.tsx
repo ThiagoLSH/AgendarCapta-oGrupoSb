@@ -19,7 +19,9 @@ export default function CaptacaoModal({ initialDate, onClose, onCreated }: Capta
   const [horaFim, setHoraFim] = useState("11:00");
   const [local, setLocal] = useState("");
   const [solicitante, setSolicitante] = useState("");
+  const [telefoneSolicitante, setTelefoneSolicitante] = useState("");
   const [quemSeraCaptado, setQuemSeraCaptado] = useState("");
+  const [telefoneCaptado, setTelefoneCaptado] = useState("");
   const [briefing, setBriefing] = useState("");
   const [tipoCaptacao, setTipoCaptacao] = useState<TipoCaptacao>("video");
   const [roteiroPronto, setRoteiroPronto] = useState<"sim" | "nao" | "">("");
@@ -83,7 +85,9 @@ export default function CaptacaoModal({ initialDate, onClose, onCreated }: Capta
           horaFim,
           local,
           solicitante,
+          telefoneSolicitante: telefoneSolicitante || undefined,
           quemSeraCaptado,
+          telefoneCaptado: telefoneCaptado || undefined,
           briefing,
           tipoCaptacao,
           roteiroPronto: roteiroPronto === "sim",
@@ -212,11 +216,30 @@ export default function CaptacaoModal({ initialDate, onClose, onCreated }: Capta
               <input value={solicitante} onChange={(e) => setSolicitante(e.target.value)} />
             </div>
             <div>
+              <label>Telefone do solicitante</label>
+              <input
+                value={telefoneSolicitante}
+                onChange={(e) => setTelefoneSolicitante(e.target.value)}
+                placeholder="+55 84 9 9999-9999"
+              />
+            </div>
+          </div>
+
+          <div className="form-row" style={{ marginBottom: 18 }}>
+            <div>
               <label>Quem será captado</label>
               <input
                 value={quemSeraCaptado}
                 onChange={(e) => setQuemSeraCaptado(e.target.value)}
                 placeholder="Pessoa/equipe no vídeo"
+              />
+            </div>
+            <div>
+              <label>Telefone de quem será captado</label>
+              <input
+                value={telefoneCaptado}
+                onChange={(e) => setTelefoneCaptado(e.target.value)}
+                placeholder="+55 84 9 9999-9999"
               />
             </div>
           </div>

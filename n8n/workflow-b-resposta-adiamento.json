@@ -1,0 +1,259 @@
+{
+  "name": "SB Captação — Recebimento e Adiamento",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sb-captacao-whatsapp",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook-receber",
+      "name": "Receber Mensagem UAZAPI",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// ===== CONFIG — edite os valores abaixo antes de ativar o workflow =====\n// (mesmos valores do workflow A — mantenha os dois sincronizados)\nreturn [{\n  json: {\n    clickupBaseUrl: \"https://api.clickup.com/api/v2\",\n    clickupListId: \"901321051391\",\n\n    fieldTarefasSkill: \"036acdcf-df5a-4a6f-a944-3845236cd64a\",\n    valorSkillCaptacao: \"5f1d6dd8-7738-4754-a0b9-a033b8be380b\",\n    fieldNomeCaptado: \"5eac4259-559b-4faa-bae0-b5d544a1a040\",\n    fieldTelefoneCaptado: \"PREENCHER_UUID_TELEFONE_CAPTADO\",\n\n    uazapiBaseUrl: \"https://SEU-DOMINIO.uazapi.com\",\n\n    telefoneThiago: \"PREENCHER_55DDNNNNNNNNN\",\n    telefoneMariaClara: \"PREENCHER_55DDNNNNNNNNN\",\n\n    googleSheetsSpreadsheetId: \"PREENCHER_ID_DA_PLANILHA\",\n    googleSheetsLogTab: \"Log\"\n  }\n}];"
+      },
+      "id": "code-config",
+      "name": "CONFIG",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Extrai remetente e texto do payload da UAZAPI de forma defensiva — o formato exato\n// só dá pra confirmar com um payload real chegando (rode 1x e confira em $json.body\n// com \"Listen for test event\"; ajuste os caminhos abaixo se vierem diferentes).\nconst item = $input.first().json;\nconst payload = item.body ?? item;\nconst msg = payload.message || payload.data || payload;\n\nconst texto = (\n  msg.text ??\n  msg.body ??\n  msg?.message?.conversation ??\n  msg?.content ??\n  ''\n).toString().trim();\n\nconst remetenteBruto = (\n  msg.sender ??\n  msg.from ??\n  msg.chatid ??\n  msg.number ??\n  payload.chatid ??\n  ''\n).toString();\nconst remetente = remetenteBruto.replace(/\\D/g, '');\n\nconst fromMe = Boolean(msg.fromMe ?? payload.fromMe ?? false);\nconst wasSentByApi = Boolean(msg.wasSentByApi ?? payload.wasSentByApi ?? false);\n\nconst textoNormalizado = texto.toLowerCase();\nconst ehComandoAdiar = textoNormalizado === 'adiar captação' || textoNormalizado === 'adiar captacao';\n\nreturn [{\n  json: {\n    texto,\n    remetente,\n    ehComandoAdiar,\n    ignorar: fromMe || wasSentByApi || !texto || !remetente,\n  }\n}];"
+      },
+      "id": "code-normalizar",
+      "name": "Normalizar Mensagem",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.ehComandoAdiar }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            },
+            {
+              "leftValue": "={{ $json.ignorar }}",
+              "rightValue": false,
+              "operator": { "type": "boolean", "operation": "false", "singleValue": true }
+            }
+          ]
+        }
+      },
+      "id": "if-e-adiar",
+      "name": "É pedido de adiar?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [660, 0]
+    },
+    { "parameters": {}, "id": "noop-ignorar", "name": "Ignorar", "type": "n8n-nodes-base.noOp", "typeVersion": 1, "position": [880, 140] },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('CONFIG').first().json.clickupBaseUrl }}/list/{{ $('CONFIG').first().json.clickupListId }}/task",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "include_closed", "value": "false" },
+            {
+              "name": "custom_fields",
+              "value": "={{ JSON.stringify([{ field_id: $('CONFIG').first().json.fieldTarefasSkill, operator: 'ANY', value: [$('CONFIG').first().json.valorSkillCaptacao] }, { field_id: $('CONFIG').first().json.fieldTelefoneCaptado, operator: 'ANY', value: [$json.remetente] }]) }}"
+            }
+          ]
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "http-buscar-por-telefone",
+      "name": "ClickUp: Buscar Captação do Telefone",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, -100],
+      "credentials": {
+        "httpHeaderAuth": { "id": "PREENCHER", "name": "ClickUp Token" }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const config = $('CONFIG').first().json;\nconst remetente = $('Normalizar Mensagem').first().json.remetente;\nconst tasks = ($input.first().json.tasks) || [];\nconst nowMs = Date.now();\nconst MESES = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];\n\nfunction parseDescField(desc, label) {\n  const re = new RegExp('^' + label + ':\\\\s*(.+)$', 'm');\n  const m = (desc || '').match(re);\n  return m ? m[1].trim() : '';\n}\nfunction getCF(task, fieldId) {\n  if (!fieldId) return null;\n  const cf = (task.custom_fields || []).find(f => f.id === fieldId);\n  return cf ? cf.value : null;\n}\n\n// A busca no ClickUp já filtra pelo campo \"WhatsApp do captado\" = remetente; pegamos a\n// próxima captação (a mais próxima no tempo) que ainda não terminou há mais de 1h.\nconst candidatos = tasks\n  .filter(t => t.start_date && Number(t.start_date) > nowMs - 60 * 60 * 1000)\n  .sort((a, b) => Number(a.start_date) - Number(b.start_date));\n\nconst task = candidatos[0];\n\nif (!task) {\n  return [{\n    json: {\n      naoEncontrado: true,\n      remetente,\n      respostaCaptado: 'Não encontrei nenhuma captação sua marcada pra frente. Fala direto com a gente pra resolver.',\n      avisos: [],\n      comentarioClickUp: '',\n      taskId: null,\n    }\n  }];\n}\n\nconst startMs = Number(task.start_date);\nconst diffMin = (startMs - nowMs) / 60000;\nconst dentroPrazo = diffMin >= 60;\n\nconst marcaMatch = (task.name || '').match(/^\\[CAPTAÇÃO\\]\\s*([^-]+?)\\s*-/);\nconst marca = marcaMatch ? marcaMatch[1].trim() : '';\nconst desc = task.text_content || task.description || '';\nconst solicitanteNome = parseDescField(desc, 'Solicitante') || 'o solicitante';\nconst solicitanteTel = parseDescField(desc, 'WhatsApp do solicitante').replace(/\\D/g, '');\nconst nomeCaptado = (getCF(task, config.fieldNomeCaptado) || '').toString().trim() || 'a pessoa captada';\n\nconst shifted = new Date(startMs - 3 * 60 * 60 * 1000);\nconst dataFmt = `${String(shifted.getUTCDate()).padStart(2, '0')} ${MESES[shifted.getUTCMonth()]}`;\nconst horaFmt = `${String(shifted.getUTCHours()).padStart(2, '0')}:${String(shifted.getUTCMinutes()).padStart(2, '0')}`;\n\nlet respostaCaptado;\nlet comentarioClickUp;\nlet textoAviso;\n\nif (dentroPrazo) {\n  respostaCaptado = 'Tudo bem, vamos remarcar. Consegue sugerir uma nova data e horário para a captação? Precisa ser dentro dos próximos 7 dias, a partir de hoje.';\n  comentarioClickUp = `Pedido de adiamento (dentro do prazo) recebido via WhatsApp de ${nomeCaptado}. Aguardando sugestão de nova data (prazo: 7 dias a partir de hoje). Revisar manualmente.`;\n  textoAviso = `A captação de ${marca} (${dataFmt} ${horaFmt}) foi adiada por ${nomeCaptado}. Aguardando sugestão de nova data (prazo de 7 dias).`;\n} else {\n  respostaCaptado = `Esse horário já está muito próximo (menos de 1h) para adiar por aqui. Fala direto com ${solicitanteNome} ou comigo pra resolver.`;\n  comentarioClickUp = `🚨 Pedido de adiamento EM CIMA DA HORA (menos de 1h) via WhatsApp de ${nomeCaptado}. Recusado automaticamente — precisa de contato manual.`;\n  textoAviso = `🚨 ${nomeCaptado} pediu pra adiar a captação de ${marca} (${dataFmt} ${horaFmt}) em cima da hora (menos de 1h). Precisa de atenção manual.`;\n}\n\nconst avisos = [\n  { telefone: config.telefoneThiago, texto: textoAviso },\n  { telefone: config.telefoneMariaClara, texto: textoAviso },\n];\nif (solicitanteTel) {\n  avisos.push({ telefone: solicitanteTel, texto: textoAviso });\n}\n// se a task não tiver \"WhatsApp do solicitante\" preenchido, ele simplesmente não recebe\n// o aviso automático — Thiago e Maria recebem sempre.\n\nreturn [{\n  json: {\n    naoEncontrado: false,\n    taskId: task.id,\n    dentroPrazo,\n    remetente,\n    respostaCaptado,\n    comentarioClickUp,\n    avisos,\n  }\n}];"
+      },
+      "id": "code-calcular-prazo",
+      "name": "Calcular prazo e montar respostas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, -100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('CONFIG').first().json.uazapiBaseUrl }}/send/text",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ number: $json.remetente, text: $json.respostaCaptado }) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "http-responder-captado",
+      "name": "UAZAPI: Responder ao Captado",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1320, -220],
+      "credentials": {
+        "httpHeaderAuth": { "id": "PREENCHER", "name": "UAZAPI Token" }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.naoEncontrado }}",
+              "rightValue": false,
+              "operator": { "type": "boolean", "operation": "false", "singleValue": true }
+            }
+          ]
+        }
+      },
+      "id": "if-task-encontrada",
+      "name": "Task encontrada?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1320, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('CONFIG').first().json.clickupBaseUrl }}/task/{{ $json.taskId }}/comment",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ comment_text: $json.comentarioClickUp, notify_all: false }) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "http-comentar-task",
+      "name": "ClickUp: Comentar Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, -60],
+      "credentials": {
+        "httpHeaderAuth": { "id": "PREENCHER", "name": "ClickUp Token" }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "avisos",
+        "options": { "destinationFieldName": "avisos" }
+      },
+      "id": "splitout-avisos",
+      "name": "Uma linha por aviso",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [1540, 100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('CONFIG').first().json.uazapiBaseUrl }}/send/text",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ number: $json.avisos.telefone, text: $json.avisos.texto }) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "http-enviar-avisos",
+      "name": "UAZAPI: Enviar Avisos aos 3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1760, 100],
+      "credentials": {
+        "httpHeaderAuth": { "id": "PREENCHER", "name": "UAZAPI Token" }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "mode": "id", "value": "={{ $('CONFIG').first().json.googleSheetsSpreadsheetId }}" },
+        "sheetName": { "mode": "name", "value": "={{ $('CONFIG').first().json.googleSheetsLogTab }}" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ new Date().toISOString() }}",
+            "Telefone": "={{ $json.avisos.telefone }}",
+            "Tipo": "aviso_adiamento",
+            "Mensagem": "={{ $json.avisos.texto }}",
+            "TaskId": "={{ $('Calcular prazo e montar respostas').first().json.taskId }}",
+            "Status": "={{ $json.error ? 'erro' : 'enviado' }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "sheets-log-adiamento",
+      "name": "Log de Adiamento",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1980, 100],
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "PREENCHER", "name": "Google Sheets — Captação" }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Receber Mensagem UAZAPI": { "main": [[{ "node": "CONFIG", "type": "main", "index": 0 }]] },
+    "CONFIG": { "main": [[{ "node": "Normalizar Mensagem", "type": "main", "index": 0 }]] },
+    "Normalizar Mensagem": { "main": [[{ "node": "É pedido de adiar?", "type": "main", "index": 0 }]] },
+    "É pedido de adiar?": {
+      "main": [
+        [{ "node": "ClickUp: Buscar Captação do Telefone", "type": "main", "index": 0 }],
+        [{ "node": "Ignorar", "type": "main", "index": 0 }]
+      ]
+    },
+    "ClickUp: Buscar Captação do Telefone": { "main": [[{ "node": "Calcular prazo e montar respostas", "type": "main", "index": 0 }]] },
+    "Calcular prazo e montar respostas": {
+      "main": [[
+        { "node": "UAZAPI: Responder ao Captado", "type": "main", "index": 0 },
+        { "node": "Task encontrada?", "type": "main", "index": 0 }
+      ]]
+    },
+    "Task encontrada?": {
+      "main": [
+        [
+          { "node": "ClickUp: Comentar Task", "type": "main", "index": 0 },
+          { "node": "Uma linha por aviso", "type": "main", "index": 0 }
+        ],
+        []
+      ]
+    },
+    "Uma linha por aviso": { "main": [[{ "node": "UAZAPI: Enviar Avisos aos 3", "type": "main", "index": 0 }]] },
+    "UAZAPI: Enviar Avisos aos 3": { "main": [[{ "node": "Log de Adiamento", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "pinData": {}
+}
