@@ -94,6 +94,7 @@
     {
       "parameters": {
         "fieldToSplitOut": "mensagens",
+        "include": "allOtherFields",
         "options": { "destinationFieldName": "mensagens" }
       },
       "id": "splitout-mensagens",

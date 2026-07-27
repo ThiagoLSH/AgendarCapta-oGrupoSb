@@ -166,6 +166,7 @@
     {
       "parameters": {
         "fieldToSplitOut": "avisos",
+        "include": "allOtherFields",
         "options": { "destinationFieldName": "avisos" }
       },
       "id": "splitout-avisos",
