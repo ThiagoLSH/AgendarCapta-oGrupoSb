@@ -1,6 +1,13 @@
 // Regras de negócio fixas do sistema de agenda de captação (Grupo SB).
 // Alterar aqui exige revalidar com o time de marketing (Maria Clara) antes de subir.
 
+/** Status inicial de toda task criada pelo site (captação, roteiro, edição) — a lista
+ * tem "solicitado form" como status default, mas as tasks daqui devem cair direto em
+ * "pendente" (fila de trabalho), sem passar pela etapa de formulário/solicitação. */
+// Atenção: o nome do status no ClickUp tem um espaço no final ("pendente "), e a API
+// exige o nome exato (confirmado testando contra a lista House Quatro5 de verdade).
+export const STATUS_PENDENTE = "pendente ";
+
 export const CLICKUP = {
   listId: "901321051391", // House Quatro5
   folderId: "901313343285", // MKT

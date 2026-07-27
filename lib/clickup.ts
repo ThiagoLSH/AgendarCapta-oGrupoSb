@@ -1,4 +1,4 @@
-import { CLICKUP, CUSTOM_FIELDS, FIXED_FIELD_VALUES } from "./config";
+import { CLICKUP, CUSTOM_FIELDS, FIXED_FIELD_VALUES, STATUS_PENDENTE } from "./config";
 
 const CLICKUP_API_BASE = "https://api.clickup.com/api/v2";
 
@@ -94,6 +94,7 @@ export async function createCaptacaoTask(input: CreateCaptacaoInput): Promise<Cl
     description: input.description ?? "",
     assignees: [Number(CLICKUP.thiagoUserId)],
     priority: PRIORITY_MAP[input.priority],
+    status: STATUS_PENDENTE,
     start_date: input.startDateMs,
     start_date_time: true,
     due_date: input.dueDateMs,
@@ -187,6 +188,7 @@ export async function createRoteiroTask(input: CreateRoteiroInput): Promise<Clic
     name: input.name,
     description: input.description,
     assignees: [Number(CLICKUP.zionUserId)],
+    status: STATUS_PENDENTE,
     custom_fields: [
       { id: CUSTOM_FIELDS.empresa, value: [input.empresaUuid] },
       { id: CUSTOM_FIELDS.tarefasSkill, value: [FIXED_FIELD_VALUES.tarefasSkillRoteiro] },
@@ -231,6 +233,7 @@ export async function createEdicaoTask(input: CreateEdicaoInput): Promise<ClickU
     name: input.name,
     description: input.description,
     assignees: [Number(assigneeId)],
+    status: STATUS_PENDENTE,
     custom_fields: [
       { id: CUSTOM_FIELDS.empresa, value: [input.empresaUuid] },
       { id: CUSTOM_FIELDS.tarefasSkill, value: [skillFieldValue] },
