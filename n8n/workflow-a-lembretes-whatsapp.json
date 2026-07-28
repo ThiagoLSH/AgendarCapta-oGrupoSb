@@ -133,10 +133,10 @@
           "mappingMode": "defineBelow",
           "value": {
             "Timestamp": "={{ new Date().toISOString() }}",
-            "Telefone": "={{ $json.telefone }}",
-            "Tipo": "={{ $json.tipoMensagem || 'mensagem' }}",
-            "Mensagem": "={{ $json.mensagens }}",
-            "TaskId": "={{ $json.taskId }}",
+            "Telefone": "={{ $('Uma linha por mensagem').item.json.telefone }}",
+            "Tipo": "={{ $('Uma linha por mensagem').item.json.tipoMensagem || 'mensagem' }}",
+            "Mensagem": "={{ $('Uma linha por mensagem').item.json.mensagens }}",
+            "TaskId": "={{ $('Uma linha por mensagem').item.json.taskId }}",
             "Status": "={{ $json.error ? 'erro' : 'enviado' }}"
           }
         },
@@ -180,7 +180,7 @@
           "combinator": "and",
           "conditions": [
             {
-              "leftValue": "={{ $json.precisaMarcarApresentacao }}",
+              "leftValue": "={{ $('Montar ações e mensagens').item.json.precisaMarcarApresentacao }}",
               "rightValue": true,
               "operator": { "type": "boolean", "operation": "true", "singleValue": true }
             }
@@ -202,10 +202,10 @@
         "columns": {
           "mappingMode": "defineBelow",
           "value": {
-            "Telefone": "={{ $json.telefone }}",
-            "Nome": "={{ $json.nomeCaptado }}",
+            "Telefone": "={{ $('Montar ações e mensagens').item.json.telefone }}",
+            "Nome": "={{ $('Montar ações e mensagens').item.json.nomeCaptado }}",
             "Já Recebeu Apresentação": "sim",
-            "Data da Primeira Captação": "={{ $json.dataFmt }}"
+            "Data da Primeira Captação": "={{ $('Montar ações e mensagens').item.json.dataFmt }}"
           }
         },
         "options": {}

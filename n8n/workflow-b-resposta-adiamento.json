@@ -205,9 +205,9 @@
           "mappingMode": "defineBelow",
           "value": {
             "Timestamp": "={{ new Date().toISOString() }}",
-            "Telefone": "={{ $json.avisos.telefone }}",
+            "Telefone": "={{ $('Uma linha por aviso').item.json.avisos.telefone }}",
             "Tipo": "aviso_adiamento",
-            "Mensagem": "={{ $json.avisos.texto }}",
+            "Mensagem": "={{ $('Uma linha por aviso').item.json.avisos.texto }}",
             "TaskId": "={{ $('Calcular prazo e montar respostas').first().json.taskId }}",
             "Status": "={{ $json.error ? 'erro' : 'enviado' }}"
           }

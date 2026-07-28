@@ -106,7 +106,37 @@ vezes precisam ser reconfirmados na interface do n8n depois de um import via JSO
 percorre os dois workflows conferindo se os `IF` mostram as condições certas e se os
 dois Google Sheets apontam pra planilha/aba certas.
 
-## 7. Lógica implementada (resumo)
+## 7. Regra geral: nunca usar `$json` depois de um node HTTP Request
+
+Um HTTP Request **substitui** o `$json` do item pela resposta da API — não faz merge
+com os campos que entraram nele. Se um node mais à frente precisar de um campo que só
+existia antes do HTTP (ex: `telefone`, `taskId`, `precisaMarcarApresentacao`), tem que
+referenciar o node de origem explicitamente: `$('Nome do Node').item.json.campo`, nunca
+`$json.campo`.
+
+Foi exatamente isso que causava a planilha "Contatos de Captação" ficar sempre vazia e
+a apresentação ser reenviada toda vez: o IF "Precisa marcar apresentação?" e o node
+"Atualizar Contato" liam `$json` depois do "ClickUp: Atualizar Estágio" (HTTP), que já
+tinha apagado esses campos. Corrigido nos dois workflows (`Precisa marcar
+apresentação?`, `Atualizar Contato`, `Log de Envio`, `Log de Adiamento`) — se for criar
+um node novo nessa mesma posição (depois de um HTTP/Sheets), lembrar dessa regra.
+
+## 8. Pendência conhecida: "Estágio do lembrete" não reseta após adiamento aceito
+
+Se alguém pede adiamento dentro do prazo (workflow B) e a task é remarcada manualmente
+no ClickUp pra uma nova data, o campo "Estágio do lembrete" continua no valor antigo.
+Se já tinha chegado a `4` (lembrete de 30min já mandado) antes do adiamento, a captação
+**nunca mais** recebe confirmação/lembrete pra nova data — nenhuma das condições do
+workflow A volta a bater.
+
+Não implementei um reset automático de propósito: resetar o estágio pra `0` no momento
+do pedido de adiamento dispararia uma "confirmação" prematura no próximo poll do
+workflow A usando a data **antiga** (a task só é remarcada manualmente depois, por uma
+pessoa). Precisa decidir o fluxo certo antes de automatizar — ex: resetar só depois que
+alguém *de fato* mudar a data no ClickUp, o que exigiria detectar essa mudança (webhook
+do ClickUp ou comparação de `due_date` a cada poll).
+
+## 9. Lógica implementada (resumo)
 
 - **Workflow A**: Schedule (15/15min) → busca captações abertas no ClickUp → cruza com
   a planilha de contatos → decide se manda apresentação + confirmação/lembrete →
