@@ -6,6 +6,8 @@ import {
   createEdicaoTask,
   createRoteiroTask,
   createTaskComment,
+  deleteTask,
+  listCaptacaoTasks,
 } from "@/lib/clickup";
 import { buildRoteiroTaskName, buildTaskName } from "@/lib/naming";
 import {
@@ -16,6 +18,7 @@ import {
   TipoCaptacao,
   pontosFromDuracaoHoras,
 } from "@/lib/config";
+import { findOverlappingTasks, HORARIO_INDISPONIVEL_MESSAGE, pickEarliestTask } from "@/lib/conflict";
 import { syncSingleTask } from "@/lib/sync";
 import { fortalezaToUtc } from "@/lib/timezone";
 
@@ -47,6 +50,13 @@ function parseLocalDateTime(data: string, hora: string): Date {
   const [year, month, day] = data.split("-").map(Number);
   const [hour, minute] = hora.split(":").map(Number);
   return fortalezaToUtc(year, month, day, hour, minute);
+}
+
+function horarioIndisponivelResponse() {
+  return NextResponse.json(
+    { error: "HORARIO_INDISPONIVEL", message: HORARIO_INDISPONIVEL_MESSAGE },
+    { status: 409 }
+  );
 }
 
 export async function POST(req: NextRequest) {
@@ -108,6 +118,21 @@ export async function POST(req: NextRequest) {
   const duracaoHoras = (fim.getTime() - inicio.getTime()) / (1000 * 60 * 60);
   const { pontos, precisaConfirmar } = pontosFromDuracaoHoras(duracaoHoras);
 
+  const requestedWindow = { start: inicio, end: fim };
+
+  // Checagem A: conflito de horário é GLOBAL entre todas as marcas (mesma equipe de
+  // captação) — não deixa nem chegar a criar a task se já tiver algo reservado na janela.
+  // Se a própria checagem falhar (erro ao consultar o ClickUp), não bloqueia o fluxo: a
+  // checagem de corrida logo depois de criar a task (passo B) ainda protege contra conflito.
+  try {
+    const existingTasks = await listCaptacaoTasks();
+    if (findOverlappingTasks(requestedWindow, existingTasks).length > 0) {
+      return horarioIndisponivelResponse();
+    }
+  } catch (err) {
+    console.error("Falha ao checar conflito de horário antes de criar a task:", err);
+  }
+
   const name = buildTaskName({ marca: body.marca, titulo: body.titulo, inicio });
 
   const descriptionLines = [
@@ -139,6 +164,31 @@ export async function POST(req: NextRequest) {
       telefoneSolicitante: body.telefoneSolicitante,
       telefoneCaptado: body.telefoneCaptado,
     });
+
+    // Checagem B: proteção contra corrida (duas pessoas enviando quase ao mesmo tempo pro
+    // mesmo horário). Refaz a checagem de sobreposição já incluindo a task recém-criada —
+    // se mais de uma task ativa disputar a mesma janela, só a criada primeiro no ClickUp
+    // (date_created) sobrevive. Roda antes de criar roteiro/edição e antes de sincronizar
+    // no Google Calendar, então perder a corrida aqui nunca deixa dependentes órfãos.
+    try {
+      const tasksAfterCreate = await listCaptacaoTasks();
+      const pool = tasksAfterCreate.some((t) => t.id === task.id)
+        ? tasksAfterCreate
+        : [...tasksAfterCreate, task];
+      const overlapping = findOverlappingTasks(requestedWindow, pool);
+
+      if (overlapping.length > 1) {
+        const winner = pickEarliestTask(overlapping);
+        if (winner.id !== task.id) {
+          await deleteTask(task.id).catch((err) =>
+            console.error("Falha ao apagar task perdedora da corrida de horário:", err)
+          );
+          return horarioIndisponivelResponse();
+        }
+      }
+    } catch (err) {
+      console.error("Falha ao checar corrida de horário após criar a task:", err);
+    }
 
     let roteiroTask: { id: string; name: string; url: string } | null = null;
     let roteiroTaskError: string | null = null;

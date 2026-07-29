@@ -73,6 +73,7 @@ export default function NovaCaptacaoPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [conflictoHorario, setConflictoHorario] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem(NOME_STORAGE_KEY);
@@ -160,7 +161,14 @@ export default function NovaCaptacaoPage() {
       });
 
       const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? "Erro desconhecido");
+      if (!res.ok) {
+        if (res.status === 409 && body.error === "HORARIO_INDISPONIVEL") {
+          setConflictoHorario(true);
+          setSubmitting(false);
+          return;
+        }
+        throw new Error(body.error ?? "Erro desconhecido");
+      }
 
       if (roteiroFile) {
         const formData = new FormData();
@@ -195,6 +203,15 @@ export default function NovaCaptacaoPage() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function handleEscolherOutroHorario() {
+    setConflictoHorario(false);
+    setData("");
+    setHoraInicio("09:00");
+    setHoraFim("11:00");
+    setError(null);
+    setStep(1);
   }
 
   function restart() {
@@ -486,6 +503,20 @@ export default function NovaCaptacaoPage() {
           </button>
         </div>
       </div>
+
+      {conflictoHorario && (
+        <div className="modal-overlay">
+          <div className="modal-content card" style={{ maxWidth: 420, textAlign: "center" }}>
+            <h2>Horário indisponível</h2>
+            <p className="subtitle" style={{ margin: "8px 0 22px" }}>
+              Esse horário já está reservado por outra captação. Escolha outro horário.
+            </p>
+            <button type="button" className="btn btn-primary btn-block" onClick={handleEscolherOutroHorario}>
+              Escolher outro horário
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

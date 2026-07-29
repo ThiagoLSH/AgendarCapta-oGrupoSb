@@ -33,6 +33,9 @@ export default function CaptacaoModal({ initialDate, onClose, onCreated }: Capta
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [conflictoHorario, setConflictoHorario] = useState(false);
+
+  const dataInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch("/api/session")
@@ -98,7 +101,14 @@ export default function CaptacaoModal({ initialDate, onClose, onCreated }: Capta
       });
 
       const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? "Erro desconhecido");
+      if (!res.ok) {
+        if (res.status === 409 && body.error === "HORARIO_INDISPONIVEL") {
+          setConflictoHorario(true);
+          setSubmitting(false);
+          return;
+        }
+        throw new Error(body.error ?? "Erro desconhecido");
+      }
 
       if (roteiroFile) {
         const formData = new FormData();
@@ -121,6 +131,15 @@ export default function CaptacaoModal({ initialDate, onClose, onCreated }: Capta
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function handleEscolherOutroHorario() {
+    setConflictoHorario(false);
+    setData("");
+    setHoraInicio("09:00");
+    setHoraFim("11:00");
+    setError(null);
+    setTimeout(() => dataInputRef.current?.focus(), 0);
   }
 
   return (
@@ -191,7 +210,7 @@ export default function CaptacaoModal({ initialDate, onClose, onCreated }: Capta
 
           <div className="field-group">
             <label>Data</label>
-            <input type="date" value={data} onChange={(e) => setData(e.target.value)} />
+            <input ref={dataInputRef} type="date" value={data} onChange={(e) => setData(e.target.value)} />
           </div>
 
           <div className="form-row" style={{ marginBottom: 18 }}>
@@ -332,6 +351,20 @@ export default function CaptacaoModal({ initialDate, onClose, onCreated }: Capta
           </div>
         </form>
       </div>
+
+      {conflictoHorario && (
+        <div className="modal-overlay" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content card" style={{ maxWidth: 420, textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
+            <h2>Horário indisponível</h2>
+            <p className="subtitle" style={{ margin: "8px 0 22px" }}>
+              Esse horário já está reservado por outra captação. Escolha outro horário.
+            </p>
+            <button type="button" className="btn btn-primary btn-block" onClick={handleEscolherOutroHorario}>
+              Escolher outro horário
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
