@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import CaptacaoModal from "./CaptacaoModal";
+import { MARCAS, Marca } from "@/lib/config";
+import { toFortalezaParts } from "@/lib/timezone";
 
 interface CaptacaoEvent {
   id: string;
@@ -15,7 +17,22 @@ interface CaptacaoEvent {
 }
 
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-const MAX_VISIBLE_PER_DAY = 3;
+
+// Janela de referência da mini barra de tempo dentro de cada dia do calendário mensal
+// (estilo "day view" do Google Calendar, só que espremido na célula do mês). Captações
+// raramente saem de 06h–23h no fuso de Fortaleza (ver PERIODO_HORA_PADRAO em lib/naming.ts:
+// Manhã=09h, Tarde=14h, Noite=19h, e periodoFromHour em lib/config.ts já classifica >=18h
+// como Noite) — se um dia isso passar a não bastar, é só ajustar as duas constantes abaixo.
+const TIMELINE_START_HOUR = 6;
+const TIMELINE_END_HOUR = 23;
+// Duração mínima (em horas, dentro da janela acima) que uma barra ocupa visualmente, pra
+// captações curtas não virarem uma linha invisível de 1px.
+const TIMELINE_MIN_DURATION_HOURS = 0.75;
+// Linhas-guia sutis dentro da barra, só de referência visual (10h, 14h, 18h).
+const TIMELINE_GUIDE_HOURS = [10, 14, 18];
+
+type MarcaFilter = Marca | "Todas";
+const MARCA_FILTER_OPTIONS: MarcaFilter[] = ["Todas", ...MARCAS];
 
 const MARCA_COLOR_VAR: Record<string, string> = {
   "SeuBoné": "--marca-seubone",
@@ -48,6 +65,42 @@ function toInputDate(d: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+/** Hora fracionária (ex.: 14h30 -> 14.5) no fuso de Fortaleza, a partir de um epoch ms. */
+function hourFraction(epochMs: number): number {
+  const { hour, minute } = toFortalezaParts(new Date(epochMs));
+  return hour + minute / 60;
+}
+
+/** "HH:mm" no fuso de Fortaleza, pro tooltip/rótulo da barra. */
+function formatHourLabel(epochMs: number): string {
+  const { hour, minute } = toFortalezaParts(new Date(epochMs));
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+/**
+ * Posição (top/altura em %) da barra de uma captação dentro da mini timeline do dia,
+ * proporcional ao horário real dentro da janela TIMELINE_START_HOUR–TIMELINE_END_HOUR.
+ * As captações já não se sobrepõem no tempo (trava em lib/conflict.ts), então não
+ * precisamos resolver colisão visual — só posicionar cada uma no seu lugar.
+ */
+function resolveTimelinePosition(startMs: number, endMs: number): { topPct: number; heightPct: number } {
+  const span = TIMELINE_END_HOUR - TIMELINE_START_HOUR;
+  const clamp = (v: number) => Math.min(Math.max(v, TIMELINE_START_HOUR), TIMELINE_END_HOUR);
+
+  let start = clamp(hourFraction(startMs));
+  let end = clamp(hourFraction(endMs));
+
+  if (end - start < TIMELINE_MIN_DURATION_HOURS) {
+    end = Math.min(start + TIMELINE_MIN_DURATION_HOURS, TIMELINE_END_HOUR);
+    start = Math.max(end - TIMELINE_MIN_DURATION_HOURS, TIMELINE_START_HOUR);
+  }
+
+  return {
+    topPct: ((start - TIMELINE_START_HOUR) / span) * 100,
+    heightPct: ((end - start) / span) * 100,
+  };
+}
+
 export default function CalendarPage() {
   const today = new Date();
   const [cursor, setCursor] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
@@ -55,6 +108,7 @@ export default function CalendarPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [modalDate, setModalDate] = useState<string | null>(null);
+  const [marcaFilter, setMarcaFilter] = useState<MarcaFilter>("Todas");
 
   const loadEvents = useCallback(() => {
     setLoading(true);
@@ -75,16 +129,26 @@ export default function CalendarPage() {
 
   const days = useMemo(() => buildMonthGrid(cursor.getFullYear(), cursor.getMonth()), [cursor]);
 
+  const filteredEvents = useMemo(() => {
+    if (marcaFilter === "Todas") return events;
+    return events.filter((ev) => {
+      // Tasks sem marca reconhecida caem visualmente no grupo "Outro" (mesma
+      // regra da cor do pill), então o filtro "Outro" também as inclui.
+      const marca = ev.marca ?? "Outro";
+      return marca === marcaFilter;
+    });
+  }, [events, marcaFilter]);
+
   const eventsByDay = useMemo(() => {
     const map = new Map<string, CaptacaoEvent[]>();
-    for (const ev of events) {
+    for (const ev of filteredEvents) {
       const key = new Date(ev.start).toDateString();
       const list = map.get(key) ?? [];
       list.push(ev);
       map.set(key, list);
     }
     return map;
-  }, [events]);
+  }, [filteredEvents]);
 
   const monthLabel = cursor.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
@@ -122,6 +186,21 @@ export default function CalendarPage() {
           </button>
         </div>
 
+        <div className="cal-filter">
+          <label htmlFor="marca-filter">Marca:</label>
+          <select
+            id="marca-filter"
+            value={marcaFilter}
+            onChange={(e) => setMarcaFilter(e.target.value as MarcaFilter)}
+          >
+            {MARCA_FILTER_OPTIONS.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div className="legend">
           {Object.entries(MARCA_COLOR_VAR).map(([marca, cssVar]) => (
             <span className="legend-item" key={marca}>
@@ -145,8 +224,6 @@ export default function CalendarPage() {
           const outside = day.getMonth() !== cursor.getMonth();
           const isToday = isSameDay(day, today);
           const dayEvents = eventsByDay.get(day.toDateString()) ?? [];
-          const visible = dayEvents.slice(0, MAX_VISIBLE_PER_DAY);
-          const hiddenCount = dayEvents.length - visible.length;
           return (
             <div
               className={`calendar-day clickable${outside ? " outside" : ""}${isToday ? " today" : ""}`}
@@ -155,24 +232,40 @@ export default function CalendarPage() {
               title="Clique para marcar uma captação neste dia"
             >
               <div className={`day-number${isToday ? " today" : ""}`}>{day.getDate()}</div>
-              {visible.map((ev) => {
-                const cssVar = ev.marca ? MARCA_COLOR_VAR[ev.marca] : "--marca-outro";
-                return (
-                  <a
-                    key={ev.id}
-                    className="event-pill"
-                    style={{ "--marca-color": `var(${cssVar})` } as React.CSSProperties}
-                    href={ev.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    title={`${ev.name} · ${ev.marca ?? "Outro"}`}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {ev.name}
-                  </a>
-                );
-              })}
-              {hiddenCount > 0 && <div className="event-more">+{hiddenCount} mais</div>}
+              <div className="day-timeline">
+                {TIMELINE_GUIDE_HOURS.map((h) => (
+                  <span
+                    key={h}
+                    className="day-timeline-guide"
+                    style={{ top: `${((h - TIMELINE_START_HOUR) / (TIMELINE_END_HOUR - TIMELINE_START_HOUR)) * 100}%` }}
+                  />
+                ))}
+                {dayEvents.map((ev) => {
+                  const cssVar = ev.marca ? MARCA_COLOR_VAR[ev.marca] ?? "--marca-outro" : "--marca-outro";
+                  const { topPct, heightPct } = resolveTimelinePosition(ev.start, ev.end);
+                  const horario = `${formatHourLabel(ev.start)}–${formatHourLabel(ev.end)}`;
+                  return (
+                    <a
+                      key={ev.id}
+                      className="timeline-event"
+                      style={
+                        {
+                          top: `${topPct}%`,
+                          height: `${heightPct}%`,
+                          "--marca-color": `var(${cssVar})`,
+                        } as React.CSSProperties
+                      }
+                      href={ev.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={`${ev.name} · ${ev.marca ?? "Outro"} · ${horario}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <span className="timeline-event-label">{ev.name}</span>
+                    </a>
+                  );
+                })}
+              </div>
             </div>
           );
         })}

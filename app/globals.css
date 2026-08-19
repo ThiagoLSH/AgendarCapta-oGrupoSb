@@ -537,7 +537,7 @@ select {
 }
 
 .calendar-day {
-  min-height: 104px;
+  min-height: 132px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 11px;
@@ -545,6 +545,8 @@ select {
   padding: 7px;
   font-size: 12px;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .calendar-day.outside {
@@ -575,28 +577,77 @@ select {
   font-size: 12px;
 }
 
-.event-pill {
-  display: block;
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 1.35;
-  color: var(--text);
-  padding: 2px 7px;
-  margin-bottom: 3px;
-  border-radius: 5px;
-  border-left: 3px solid var(--marca-color, var(--marca-outro));
-  background: color-mix(in srgb, var(--marca-color, var(--marca-outro)) 20%, transparent);
+/*
+ * Mini timeline dentro de cada célula do dia, estilo "day view" espremido: cada
+ * captação é uma barra posicionada verticalmente proporcional ao seu horário real
+ * dentro da janela TIMELINE_START_HOUR–TIMELINE_END_HOUR (definida em calendario/page.tsx).
+ * Como duas captações nunca se sobrepõem no tempo (trava em lib/conflict.ts), as barras
+ * nunca precisam de layout lado a lado — é só um empilhamento posicionado por horário.
+ */
+.day-timeline {
+  position: relative;
+  flex: 1;
+  min-height: 78px;
+  margin-top: 4px;
+  border-radius: 7px;
+  background: var(--surface-2);
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.day-timeline-guide {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--border);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.timeline-event {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  min-height: 5px;
+  border-radius: 4px;
+  border-left: 3px solid var(--marca-color, var(--marca-outro));
+  background: color-mix(in srgb, var(--marca-color, var(--marca-outro)) 30%, var(--surface));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--marca-color, var(--marca-outro)) 40%, transparent);
+  display: flex;
+  align-items: center;
+  overflow: hidden;
   text-decoration: none;
 }
 
-.event-more {
-  font-size: 10.5px;
+.timeline-event:hover,
+.timeline-event:focus-visible {
+  z-index: 2;
+  box-shadow: 0 0 0 1.5px var(--marca-color, var(--marca-outro));
+}
+
+.timeline-event-label {
+  font-size: 9.5px;
   font-weight: 600;
+  line-height: 1.1;
+  color: var(--text);
+  padding: 0 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cal-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
   color: var(--text-muted);
-  padding: 1px 5px;
+}
+
+.cal-filter select {
+  width: auto;
+  padding: 5px 10px;
+  font-size: 13px;
 }
 
 .legend {
