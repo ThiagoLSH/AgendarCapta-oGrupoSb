@@ -9,7 +9,7 @@ import {
   deleteTask,
   listCaptacaoTasks,
 } from "@/lib/clickup";
-import { buildRoteiroTaskName, buildTaskName } from "@/lib/naming";
+import { buildEdicaoTaskName, buildRoteiroTaskName, buildTaskName } from "@/lib/naming";
 import {
   Marca,
   MARCAS,
@@ -225,7 +225,10 @@ export async function POST(req: NextRequest) {
       for (const tipo of tiposEdicao) {
         const label = tipo === "foto" ? "FOTO" : "VÍDEO";
         const edicaoTask = await createEdicaoTask({
-          name: `[EDIÇÃO DE ${label}] ${body.titulo}`,
+          name: buildEdicaoTaskName({
+            tituloBase: `[EDIÇÃO DE ${label}] ${body.titulo}`,
+            briefing: body.briefing,
+          }),
           description: [
             `Briefing:\n${body.briefing}`,
             "",

@@ -34,6 +34,47 @@ export function buildRoteiroTaskName({ marca, titulo }: { marca: Marca; titulo: 
   return `[ROTEIRO] ${marcaPrefix}${titulo}`;
 }
 
+const LIMITE_TRECHO_BRIEFING = 300;
+
+/**
+ * Extrai um trecho curto e legível do briefing pra usar no título das tasks de edição.
+ * - Troca quebras de linha internas por espaço (só depois de já ter localizado o corte por \n no texto original).
+ * - Corta no primeiro `.`, `!`, `?` ou `\n` encontrado no texto original.
+ * - Se o resultado passar de ~300 caracteres, corta na última palavra inteira dentro do limite e acrescenta "...".
+ * - Retorna string vazia se o briefing for vazio ou só espaço em branco.
+ */
+export function extrairTrechoBriefing(texto: string): string {
+  if (!texto || !texto.trim()) return "";
+
+  const corteMatch = texto.match(/[.!?\n]/);
+  const bruto = corteMatch ? texto.slice(0, corteMatch.index) : texto;
+
+  const trecho = bruto.replace(/\s*\n\s*/g, " ").trim();
+  if (!trecho) return "";
+
+  if (trecho.length <= LIMITE_TRECHO_BRIEFING) return trecho;
+
+  const cortado = trecho.slice(0, LIMITE_TRECHO_BRIEFING);
+  const ultimoEspaco = cortado.lastIndexOf(" ");
+  const semUltimaPalavraParcial = ultimoEspaco > 0 ? cortado.slice(0, ultimoEspaco) : cortado;
+  return `${semUltimaPalavraParcial.trim()}...`;
+}
+
+/**
+ * Monta o nome das tasks de edição (foto/vídeo), acrescentando ao final um trecho do
+ * briefing pra dar contexto real do que precisa ser editado.
+ */
+export function buildEdicaoTaskName({
+  tituloBase,
+  briefing,
+}: {
+  tituloBase: string;
+  briefing: string;
+}): string {
+  const trecho = extrairTrechoBriefing(briefing);
+  return trecho ? `${tituloBase} - ${trecho}` : tituloBase;
+}
+
 /** Extrai o período do dia a partir do nome de uma task antiga, quando não há hora real disponível. */
 export function guessPeriodoFromTaskName(name: string): "Manhã" | "Tarde" | "Noite" | null {
   const match = name.match(/\[(Manhã|Tarde|Noite)\]\s*$/i);
