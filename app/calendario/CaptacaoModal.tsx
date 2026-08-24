@@ -10,6 +10,26 @@ interface CaptacaoModalProps {
   onCreated: () => void;
 }
 
+interface FormSnapshot {
+  titulo: string;
+  marca: Marca;
+  submarcaUuid: string;
+  data: string;
+  horaInicio: string;
+  horaFim: string;
+  local: string;
+  solicitante: string;
+  telefoneSolicitante: string;
+  quemSeraCaptado: string;
+  telefoneCaptado: string;
+  briefing: string;
+  tipoCaptacao: TipoCaptacao;
+  roteiroPronto: "sim" | "nao" | "";
+  roteiroTexto: string;
+  prioridade: Prioridade;
+  roteiroFileName: string;
+}
+
 export default function CaptacaoModal({ initialDate, onClose, onCreated }: CaptacaoModalProps) {
   const [titulo, setTitulo] = useState("");
   const [marca, setMarca] = useState<Marca>("SeuBoné");
@@ -27,6 +47,7 @@ export default function CaptacaoModal({ initialDate, onClose, onCreated }: Capta
   const [roteiroPronto, setRoteiroPronto] = useState<"sim" | "nao" | "">("");
   const [roteiroTexto, setRoteiroTexto] = useState("");
   const [prioridade, setPrioridade] = useState<Prioridade>("normal");
+  const [roteiroFileName, setRoteiroFileName] = useState("");
 
   const roteiroFileRef = useRef<HTMLInputElement>(null);
 
@@ -34,8 +55,17 @@ export default function CaptacaoModal({ initialDate, onClose, onCreated }: Capta
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [conflictoHorario, setConflictoHorario] = useState(false);
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
 
   const dataInputRef = useRef<HTMLInputElement>(null);
+
+  // Snapshot do estado "inicial" do formulário, usado pra saber se o usuário de fato
+  // alterou algo (item 3/regra de UX). Só é gravado depois que os valores preenchidos
+  // automaticamente ao abrir o modal (data pré-selecionada + solicitante vindo da sessão)
+  // já foram aplicados — se capturássemos antes, o autofill do nome do solicitante
+  // apareceria como "alteração do usuário" e geraria aviso de fechar indevido.
+  const initialSnapshotRef = useRef<FormSnapshot | null>(null);
+  const [sessionLoaded, setSessionLoaded] = useState(false);
 
   useEffect(() => {
     fetch("/api/session")
@@ -43,8 +73,75 @@ export default function CaptacaoModal({ initialDate, onClose, onCreated }: Capta
       .then((sessionData) => {
         if (sessionData.authenticated && sessionData.name) setSolicitante(sessionData.name);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setSessionLoaded(true));
   }, []);
+
+  useEffect(() => {
+    if (sessionLoaded && initialSnapshotRef.current === null) {
+      initialSnapshotRef.current = {
+        titulo,
+        marca,
+        submarcaUuid,
+        data,
+        horaInicio,
+        horaFim,
+        local,
+        solicitante,
+        telefoneSolicitante,
+        quemSeraCaptado,
+        telefoneCaptado,
+        briefing,
+        tipoCaptacao,
+        roteiroPronto,
+        roteiroTexto,
+        prioridade,
+        roteiroFileName,
+      };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionLoaded]);
+
+  function hasUnsavedChanges(): boolean {
+    const snap = initialSnapshotRef.current;
+    if (!snap) return false;
+    return (
+      titulo !== snap.titulo ||
+      marca !== snap.marca ||
+      submarcaUuid !== snap.submarcaUuid ||
+      data !== snap.data ||
+      horaInicio !== snap.horaInicio ||
+      horaFim !== snap.horaFim ||
+      local !== snap.local ||
+      solicitante !== snap.solicitante ||
+      telefoneSolicitante !== snap.telefoneSolicitante ||
+      quemSeraCaptado !== snap.quemSeraCaptado ||
+      telefoneCaptado !== snap.telefoneCaptado ||
+      briefing !== snap.briefing ||
+      tipoCaptacao !== snap.tipoCaptacao ||
+      roteiroPronto !== snap.roteiroPronto ||
+      roteiroTexto !== snap.roteiroTexto ||
+      prioridade !== snap.prioridade ||
+      roteiroFileName !== snap.roteiroFileName
+    );
+  }
+
+  function requestClose() {
+    if (hasUnsavedChanges()) {
+      setShowCloseConfirm(true);
+    } else {
+      onClose();
+    }
+  }
+
+  function confirmDiscardAndClose() {
+    setShowCloseConfirm(false);
+    onClose();
+  }
+
+  function cancelClose() {
+    setShowCloseConfirm(false);
+  }
 
   const submarcaOptions = useMemo(() => SUBMARCAS_BY_MARCA[marca], [marca]);
 
@@ -143,9 +240,9 @@ export default function CaptacaoModal({ initialDate, onClose, onCreated }: Capta
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content card" style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
-        <button type="button" className="modal-close" onClick={onClose} aria-label="Fechar">
+    <div className="modal-overlay">
+      <div className="modal-content card" style={{ position: "relative" }}>
+        <button type="button" className="modal-close" onClick={requestClose} aria-label="Fechar">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
             <path d="M18 6L6 18M6 6l12 12" />
           </svg>
@@ -325,8 +422,14 @@ export default function CaptacaoModal({ initialDate, onClose, onCreated }: Capta
                     <path d="M17 8l-5-5-5 5" />
                     <path d="M12 3v12" />
                   </svg>
-                  Anexar PDF do roteiro
-                  <input type="file" accept="application/pdf" ref={roteiroFileRef} style={{ display: "none" }} />
+                  {roteiroFileName || "Anexar PDF do roteiro"}
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    ref={roteiroFileRef}
+                    style={{ display: "none" }}
+                    onChange={(e) => setRoteiroFileName(e.target.files?.[0]?.name ?? "")}
+                  />
                 </label>
               </div>
             )}
@@ -342,7 +445,7 @@ export default function CaptacaoModal({ initialDate, onClose, onCreated }: Capta
           {success && <div className="status-message success">{success}</div>}
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
-            <button type="button" className="btn" onClick={onClose}>
+            <button type="button" className="btn" onClick={requestClose}>
               Cancelar
             </button>
             <button type="submit" className="btn btn-primary" disabled={submitting}>
@@ -353,8 +456,8 @@ export default function CaptacaoModal({ initialDate, onClose, onCreated }: Capta
       </div>
 
       {conflictoHorario && (
-        <div className="modal-overlay" onClick={(e) => e.stopPropagation()}>
-          <div className="modal-content card" style={{ maxWidth: 420, textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay">
+          <div className="modal-content card" style={{ maxWidth: 420, textAlign: "center" }}>
             <h2>Horário indisponível</h2>
             <p className="subtitle" style={{ margin: "8px 0 22px" }}>
               Esse horário já está reservado por outra captação. Escolha outro horário.
@@ -362,6 +465,25 @@ export default function CaptacaoModal({ initialDate, onClose, onCreated }: Capta
             <button type="button" className="btn btn-primary btn-block" onClick={handleEscolherOutroHorario}>
               Escolher outro horário
             </button>
+          </div>
+        </div>
+      )}
+
+      {showCloseConfirm && (
+        <div className="modal-overlay">
+          <div className="modal-content card" style={{ maxWidth: 420, textAlign: "center" }}>
+            <h2>Fechar sem salvar?</h2>
+            <p className="subtitle" style={{ margin: "8px 0 22px" }}>
+              Tem certeza que deseja fechar? As informações preenchidas serão perdidas.
+            </p>
+            <div style={{ display: "flex", justifyContent: "center", gap: 10 }}>
+              <button type="button" className="btn" onClick={cancelClose}>
+                Cancelar
+              </button>
+              <button type="button" className="btn btn-primary" onClick={confirmDiscardAndClose}>
+                Fechar e descartar
+              </button>
+            </div>
           </div>
         </div>
       )}
