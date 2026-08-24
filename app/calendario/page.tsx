@@ -214,6 +214,7 @@ export default function CalendarPage() {
       {loading && <p>Carregando captações do ClickUp…</p>}
       {error && <p className="status-message error">Erro ao carregar: {error}</p>}
 
+      <div className="calendar-grid-scroll">
       <div className="calendar-grid">
         {WEEKDAYS.map((d) => (
           <div className="calendar-weekday" key={d}>
@@ -269,6 +270,7 @@ export default function CalendarPage() {
             </div>
           );
         })}
+      </div>
       </div>
 
       {modalDate && (

@@ -833,3 +833,202 @@ select {
 .modal-close:hover {
   color: var(--text);
 }
+
+/* ==========================================================================
+   RESPONSIVO — bloco aditivo, não reescreve nenhuma regra acima.
+   Breakpoints: tablet <=768px, mobile <=430px. 1024px+ continua exatamente
+   como estava (comportamento desktop intocado).
+   ========================================================================== */
+
+/* Container que permite rolagem horizontal da grade de 7 colunas do calendário
+   em telas muito estreitas, sem alterar a estrutura de 7 colunas em si (só
+   entra em jogo <=360px, ver regra mais abaixo). */
+.calendar-grid-scroll {
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .app-shell {
+    padding: 16px 14px 56px;
+  }
+
+  .app-header {
+    gap: 10px;
+  }
+
+  .app-header h1 {
+    font-size: 17px;
+  }
+
+  .app-header nav {
+    gap: 4px;
+  }
+
+  .app-header nav a {
+    padding: 9px 10px;
+    font-size: 13.5px;
+  }
+
+  .session-info {
+    margin-left: 0;
+    padding-left: 0;
+    border-left: none;
+    flex-basis: 100%;
+    justify-content: space-between;
+  }
+
+  .card {
+    padding: 18px;
+  }
+
+  .card-narrow {
+    margin: 24px auto 0;
+  }
+
+  /* Área de toque confortável (>=44px) em qualquer input/botão de formulário. */
+  input,
+  select,
+  textarea,
+  .btn,
+  .pill {
+    min-height: 44px;
+  }
+
+  textarea {
+    min-height: 88px;
+  }
+
+  .btn-square {
+    min-height: 38px;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .calendar-toolbar {
+    gap: 10px;
+  }
+
+  .calendar-toolbar strong {
+    font-size: 16px;
+  }
+
+  .calendar-grid {
+    gap: 4px;
+  }
+
+  .calendar-day {
+    min-height: 84px;
+    padding: 4px;
+    font-size: 10.5px;
+  }
+
+  .calendar-day .day-number {
+    font-size: 11px;
+    margin-bottom: 3px;
+  }
+
+  .day-timeline {
+    min-height: 52px;
+  }
+
+  .timeline-event-label {
+    font-size: 8.5px;
+  }
+
+  .modal-overlay {
+    padding: 0;
+    align-items: stretch;
+  }
+
+  .modal-content {
+    max-width: none;
+    margin: 0;
+    min-height: 100%;
+    border-radius: 0;
+    max-height: 100vh;
+    overflow-y: auto;
+  }
+
+  .modal-content.card {
+    padding: 18px;
+  }
+}
+
+@media (max-width: 430px) {
+  .app-header h1 {
+    font-size: 15.5px;
+  }
+
+  .app-header .brand-tag {
+    font-size: 9.5px;
+    padding-left: 8px;
+  }
+
+  .stepper {
+    margin: 14px 0 18px;
+  }
+
+  .step-label {
+    font-size: 11.5px;
+  }
+
+  .calendar-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .calendar-toolbar .cal-nav {
+    justify-content: space-between;
+  }
+
+  .cal-filter {
+    justify-content: space-between;
+  }
+
+  .legend {
+    gap: 8px;
+    justify-content: space-between;
+  }
+
+  .legend-item {
+    font-size: 10.5px;
+  }
+
+  .calendar-weekday {
+    font-size: 9.5px;
+  }
+
+  .calendar-day {
+    min-height: 68px;
+    font-size: 9.5px;
+  }
+}
+
+/* Telas muito estreitas: a grade de 7 colunas não compacta mais sem virar
+   ilegível — mantém a estrutura de 7 colunas, mas permite rolar
+   horizontalmente dentro do container em vez de trocar o layout. */
+@media (max-width: 360px) {
+  .calendar-grid-scroll {
+    overflow-x: auto;
+  }
+
+  .calendar-grid {
+    min-width: 560px;
+  }
+}
+
+.admin-manager-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: 12px;
+  align-items: end;
+}
+
+@media (max-width: 480px) {
+  .admin-manager-form {
+    grid-template-columns: 1fr;
+  }
+}

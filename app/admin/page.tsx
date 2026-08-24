@@ -157,10 +157,7 @@ export default function AdminPage() {
           <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)", margin: "0 0 14px" }}>
             Adicionar gestor
           </p>
-          <form
-            onSubmit={handleAddManager}
-            style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr auto", gap: 12, alignItems: "end" }}
-          >
+          <form onSubmit={handleAddManager} className="admin-manager-form">
             <div>
               <label>Nome</label>
               <input value={novoNome} onChange={(e) => setNovoNome(e.target.value)} required />
