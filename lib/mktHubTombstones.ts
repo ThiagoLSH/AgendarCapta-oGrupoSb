@@ -15,6 +15,7 @@
 // não é bug.
 
 import { get } from "@vercel/edge-config";
+import type { MktHubCaptacaoSnapshot } from "./mktHubIntegration";
 import { toFortalezaIso } from "./timezone";
 
 const EDGE_CONFIG_KEY = "mkt_hub_cancelamentos";
@@ -23,6 +24,19 @@ const RETENCAO_MS = 60 * 24 * 60 * 60 * 1000; // 60 dias
 export interface CancelamentoEntry {
   taskId: string;
   canceladoEm: string; // ISO-8601 com offset -03:00 (toFortalezaIso)
+  /**
+   * Retrato da captação (lib/mktHubIntegration.ts, `mapTaskToMktHubCaptacao` +
+   * `toMktHubSnapshot`) no momento do cancelamento, pra quem consome o tombstone não
+   * perder local/briefing/empresa/etc — só ficando com `estado`/`status_origem`/
+   * `atualizado_em`/`id` recalculados na leitura (`mapCancelamentoToMktHubCaptacao`).
+   *
+   * Opcional por dois motivos: (1) compatibilidade com entradas gravadas ANTES desse
+   * campo existir (não deveria sobrar nenhuma real na hora desse deploy, mas o código de
+   * leitura trata defensivamente do mesmo jeito); (2) fallback pro caso de borda em que
+   * `mapTaskToMktHubCaptacao` devolve `null` (janela de evento não resolvível) — nesse
+   * caso o cancelamento ainda é registrado, só sem o snapshot extra.
+   */
+  snapshot?: MktHubCaptacaoSnapshot;
 }
 
 interface CancelamentosPayload {
@@ -78,8 +92,15 @@ async function saveCancelamentos(cancelamentos: CancelamentoEntry[]): Promise<vo
  * volta. Chame ANTES de apagar a task de verdade no ClickUp, mas não deixe uma falha aqui
  * bloquear a exclusão real — a mesma filosofia de "falha de sync não trava o fluxo
  * principal" usada no sync do Google Calendar.
+ *
+ * `snapshot` é opcional (mantém compatibilidade com qualquer outro chamador que ainda não
+ * tenha o retrato em mãos) — quando informado, é gravado junto pra uma captação cancelada
+ * não voltar pro MKT Hub com todo o contexto perdido (ver `CancelamentoEntry.snapshot`).
  */
-export async function registrarCancelamento(taskId: string): Promise<void> {
+export async function registrarCancelamento(
+  taskId: string,
+  snapshot?: MktHubCaptacaoSnapshot
+): Promise<void> {
   const atual = await getCancelamentos();
   const corte = Date.now() - RETENCAO_MS;
   const podada = atual.filter((entry) => {
@@ -90,6 +111,7 @@ export async function registrarCancelamento(taskId: string): Promise<void> {
   const novaEntrada: CancelamentoEntry = {
     taskId,
     canceladoEm: toFortalezaIso(new Date()),
+    ...(snapshot ? { snapshot } : {}),
   };
 
   await saveCancelamentos([...podada, novaEntrada]);

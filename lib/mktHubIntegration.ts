@@ -146,27 +146,64 @@ export interface MktHubCaptacaoAgendada {
 }
 
 /**
- * Objeto mínimo devolvido pra uma captação cancelada (excluída de verdade no ClickUp,
- * cuja exclusão foi registrada em lib/mktHubTombstones.ts). A task não existe mais no
- * ClickUp, então não há de onde recuperar local/briefing/empresa/etc — todos `null`.
+ * "Retrato" de uma captação viva no momento em que ela é cancelada (excluída de verdade
+ * no ClickUp) — tudo de MktHubCaptacaoAgendada exceto os campos que são recalculados na
+ * hora da leitura de um tombstone (`mapCancelamentoToMktHubCaptacao`): `id` (usamos o
+ * `taskId` do próprio tombstone como fonte da verdade), `estado`/`status_origem` (sempre
+ * "cancelado"/"deletado" pra quem veio de tombstone) e `atualizado_em` (o momento real do
+ * cancelamento, não o `atualizado_em` antigo de quando a task ainda estava viva).
+ *
+ * Guardado dentro de `CancelamentoEntry.snapshot` (lib/mktHubTombstones.ts) pra uma
+ * captação cancelada não voltar pro MKT Hub com todo o contexto perdido (local, briefing,
+ * empresa, etc. todos `null`) só porque a task já não existe mais no ClickUp.
  */
-export interface MktHubCaptacaoCancelada {
+export type MktHubCaptacaoSnapshot = Omit<
+  MktHubCaptacaoAgendada,
+  "id" | "estado" | "status_origem" | "atualizado_em"
+>;
+
+/** Extrai de uma captação viva só os campos de "retrato" (ver MktHubCaptacaoSnapshot), pro
+ * tombstone guardar como snapshot congelado no exato momento do cancelamento. */
+export function toMktHubSnapshot(captacao: MktHubCaptacaoAgendada): MktHubCaptacaoSnapshot {
+  return {
+    inicio: captacao.inicio,
+    fim: captacao.fim,
+    data: captacao.data,
+    turno: captacao.turno,
+    local: captacao.local,
+    empresa_origem: captacao.empresa_origem,
+    quem_grava: captacao.quem_grava,
+    tipo_captacao: captacao.tipo_captacao,
+    titulo: captacao.titulo,
+    briefing: captacao.briefing,
+    criado_em: captacao.criado_em,
+  };
+}
+
+/**
+ * Objeto devolvido pra uma captação cancelada (excluída de verdade no ClickUp, cuja
+ * exclusão foi registrada em lib/mktHubTombstones.ts). Estruturalmente é o mesmo "retrato"
+ * de uma captação agendada (`MktHubCaptacaoSnapshot`), só que com cada campo também
+ * aceitando `null` — porque tombstones antigos (gravados antes do snapshot existir) ou o
+ * caso de borda em que `mapTaskToMktHubCaptacao` não conseguiu resolver a janela do evento
+ * no momento do cancelamento não têm esse retrato disponível, e caem no fallback "tudo
+ * null" de antes. `id` continua sempre `string` (é o `taskId` do tombstone, sempre
+ * conhecido), diferente dos outros campos.
+ *
+ * Optou-se por manter dois tipos (`Agendada`/`Cancelada`) em vez de um único tipo com
+ * `estado` discriminando campos opcionais, porque `Agendada` tem garantias reais de
+ * não-nulidade (ex.: `titulo`/`briefing` sempre presentes numa task viva) que `Cancelada`
+ * não pode ter (pode ou não ter snapshot) — misturar os dois enfraqueceria o tipo mais
+ * forte sem necessidade.
+ */
+export type MktHubCaptacaoCancelada = {
+  [K in keyof MktHubCaptacaoSnapshot]: MktHubCaptacaoSnapshot[K] | null;
+} & {
   id: string;
   estado: "cancelado";
   status_origem: "deletado";
   atualizado_em: string;
-  inicio: null;
-  fim: null;
-  data: null;
-  turno: null;
-  local: null;
-  empresa_origem: null;
-  quem_grava: null;
-  tipo_captacao: null;
-  titulo: null;
-  briefing: null;
-  criado_em: null;
-}
+};
 
 export type MktHubCaptacao = MktHubCaptacaoAgendada | MktHubCaptacaoCancelada;
 
@@ -216,16 +253,26 @@ export function mapTaskToMktHubCaptacao(task: ClickUpTask): MktHubCaptacaoAgenda
   };
 }
 
-/** Converte uma entrada de cancelamento (lib/mktHubTombstones.ts) pro formato MKT Hub. */
+/**
+ * Converte uma entrada de cancelamento (lib/mktHubTombstones.ts) pro formato MKT Hub.
+ *
+ * Se `entry.snapshot` existir (tombstones gravados a partir desse ajuste), devolve o
+ * retrato completo da captação como ela era pouco antes de ser cancelada, só trocando
+ * `estado`/`status_origem` (sempre "cancelado"/"deletado" aqui) e `atualizado_em` — que é
+ * o horário real do cancelamento (`canceladoEm`), o momento real da última mudança de
+ * estado desse registro, não o `atualizado_em` antigo de quando a task ainda existia.
+ *
+ * Se `entry.snapshot` NÃO existir — tombstone antigo, gravado antes desse campo existir
+ * (não deveria sobrar nenhum real hoje, mas tratamos defensivamente), ou o caso de borda
+ * em que `mapTaskToMktHubCaptacao` não conseguiu resolver a janela do evento no momento do
+ * cancelamento — cai no comportamento antigo: todos os outros campos `null`.
+ */
 export function mapCancelamentoToMktHubCaptacao(entry: {
   taskId: string;
   canceladoEm: string;
+  snapshot?: MktHubCaptacaoSnapshot;
 }): MktHubCaptacaoCancelada {
-  return {
-    id: entry.taskId,
-    estado: "cancelado",
-    status_origem: "deletado",
-    atualizado_em: entry.canceladoEm,
+  const base = entry.snapshot ?? {
     inicio: null,
     fim: null,
     data: null,
@@ -237,6 +284,14 @@ export function mapCancelamentoToMktHubCaptacao(entry: {
     titulo: null,
     briefing: null,
     criado_em: null,
+  };
+
+  return {
+    ...base,
+    id: entry.taskId,
+    estado: "cancelado",
+    status_origem: "deletado",
+    atualizado_em: entry.canceladoEm,
   };
 }
 
