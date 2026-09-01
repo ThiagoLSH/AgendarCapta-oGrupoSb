@@ -3,6 +3,7 @@ import { deleteTask, getTask } from "@/lib/clickup";
 import { deleteCaptacaoEvent } from "@/lib/googleCalendar";
 import { mapTaskToMktHubCaptacao, toMktHubSnapshot } from "@/lib/mktHubIntegration";
 import { registrarCancelamento } from "@/lib/mktHubTombstones";
+import { extrairTrechoBriefing } from "@/lib/naming";
 import { extractGoogleEventId } from "@/lib/sync";
 
 export const dynamic = "force-dynamic";
@@ -40,6 +41,16 @@ export async function DELETE(_req: Request, { params }: { params: { taskId: stri
     try {
       const captacaoViva = mapTaskToMktHubCaptacao(task);
       const snapshot = captacaoViva ? toMktHubSnapshot(captacaoViva) : undefined;
+      // O briefing completo, aqui, é truncado (mesma extração usada no título das tasks de
+      // edição, lib/naming.ts) antes de ir pro Edge Config — o store inteiro é limitado a
+      // 1MB (Hobby/Pro), dividido com a chave "managers", e um briefing longo por
+      // cancelamento, multiplicado pelos 60 dias de retenção, comia esse espaço rápido
+      // demais. Vale só pro que fica gravado no tombstone: uma captação AGENDADA continua
+      // devolvendo o briefing inteiro nos endpoints de leitura (mapTaskToMktHubCaptacao,
+      // usado em cima, não é afetado por esse corte).
+      if (snapshot) {
+        snapshot.briefing = extrairTrechoBriefing(snapshot.briefing);
+      }
       await registrarCancelamento(params.taskId, snapshot);
     } catch (err) {
       console.error("Falha ao registrar cancelamento pro MKT Hub:", err);
