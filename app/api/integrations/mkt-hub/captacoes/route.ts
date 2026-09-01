@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ClickUpTask, listCaptacaoTasksPage } from "@/lib/clickup";
-import { isAuthorizedMktHubRequest, mapTaskToMktHubCaptacao } from "@/lib/mktHubIntegration";
+import {
+  isAuthorizedMktHubRequest,
+  mapCancelamentoToMktHubCaptacao,
+  mapTaskToMktHubCaptacao,
+} from "@/lib/mktHubIntegration";
+import { getCancelamentos } from "@/lib/mktHubTombstones";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -87,9 +92,24 @@ export async function GET(req: NextRequest) {
     const pageTasks = collected.slice(sliceStart, sliceStart + limit);
     const hasMore = collected.length > sliceStart + limit || !lastPage;
 
-    const captacoes = pageTasks
-      .map((t) => mapTaskToMktHubCaptacao(t))
-      .filter((c): c is NonNullable<typeof c> => c !== null);
+    const captacoes: (ReturnType<typeof mapTaskToMktHubCaptacao> | ReturnType<typeof mapCancelamentoToMktHubCaptacao>)[] =
+      pageTasks.map((t) => mapTaskToMktHubCaptacao(t)).filter((c): c is NonNullable<typeof c> => c !== null);
+
+    // Cancelamentos (captações excluídas de verdade, registradas em lib/mktHubTombstones.ts)
+    // entram misturadas nesse mesmo array, não numa lista separada. Como não fazem parte
+    // da paginação nativa do ClickUp (não existem mais lá), só as incluímos na primeira
+    // página nossa (page 0) pra não duplicá-las a cada página buscada nem complicar o
+    // cálculo de `has_more`, que continua sendo 100% derivado do lado ClickUp.
+    if (page === 0) {
+      const cancelamentos = await getCancelamentos();
+      const cutoff = updatedSinceParam ? dateUpdatedGreaterThan : undefined;
+      const cancelamentosFiltrados = cancelamentos.filter((entry) => {
+        if (cutoff === undefined) return true;
+        const canceladoEmMs = new Date(entry.canceladoEm).getTime();
+        return Number.isFinite(canceladoEmMs) && canceladoEmMs >= cutoff;
+      });
+      captacoes.push(...cancelamentosFiltrados.map((entry) => mapCancelamentoToMktHubCaptacao(entry)));
+    }
 
     return NextResponse.json({
       captacoes,

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { deleteTask, getTask } from "@/lib/clickup";
 import { deleteCaptacaoEvent } from "@/lib/googleCalendar";
+import { registrarCancelamento } from "@/lib/mktHubTombstones";
 import { extractGoogleEventId } from "@/lib/sync";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +24,16 @@ export async function DELETE(_req: Request, { params }: { params: { taskId: stri
         // Segue apagando a task mesmo se o evento já não existir mais no Google.
         calendarDeleteError = err instanceof Error ? err.message : String(err);
       }
+    }
+
+    // Registra o cancelamento pro MKT Hub ANTES de apagar de verdade — não temos permissão
+    // pra criar status novo no ClickUp, então esse é o único jeito do MKT Hub saber que a
+    // captação foi cancelada em vez de simplesmente sumir. Falha aqui não pode travar a
+    // exclusão real (mesma filosofia de "falha de sync nunca derruba o fluxo principal").
+    try {
+      await registrarCancelamento(params.taskId);
+    } catch (err) {
+      console.error("Falha ao registrar cancelamento pro MKT Hub:", err);
     }
 
     await deleteTask(params.taskId);

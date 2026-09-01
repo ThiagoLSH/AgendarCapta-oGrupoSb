@@ -85,32 +85,6 @@ export const SUBMARCAS_BY_MARCA: Record<Marca, SubMarcaOption[]> = {
   ],
 };
 
-/**
- * Tabela de tradução das sub-marcas do NOSSO ClickUp (uuid do campo "Empresa") pro
- * companyId (uuid) equivalente no MKT Hub 2 — usada só pelo endpoint de leitura
- * /api/integrations/mkt-hub/captacoes. `null` quando a sub-marca não tem equivalente
- * mapeado no MKT Hub (holding/times internos) — nesse caso a resposta expõe
- * `slug_mkt_hub: null` mesmo, sem inventar fallback. Confirmada manualmente com o time
- * do MKT Hub; "Pedro Galvão P2P" e "Cássio Maia P2P" (existem só no lado do MKT Hub) não
- * têm equivalente no nosso ClickUp e não entram aqui.
- */
-export const SUBMARCA_UUID_TO_MKT_HUB_COMPANY_ID: Record<string, string | null> = {
-  "dc1b693f-af85-4a5f-8ee8-14816c8dab8f": "458119f9-cb4a-4374-8fba-fe5d5a3bb39a", // SeuBoné -> SeuBoné
-  "167bc5cb-e7df-4fbc-a6bb-fb8631403230": "458119f9-cb4a-4374-8fba-fe5d5a3bb39a", // SB Personalizados -> marca-mãe SeuBoné
-  "737dede3-61ec-48b8-a593-d7f76fa7c4d1": "458119f9-cb4a-4374-8fba-fe5d5a3bb39a", // SB Agro -> idem
-  "2f0f7f24-42ad-4682-838c-cf29a9b5444b": "458119f9-cb4a-4374-8fba-fe5d5a3bb39a", // SB Térmicos -> idem
-  "001a02f8-2d11-4e1f-8c31-372887c4233d": "458119f9-cb4a-4374-8fba-fe5d5a3bb39a", // SB Bolsas -> idem
-  "3162fa47-9c99-44b6-a8a5-b7f9ebd7a6eb": "2c91c11a-1906-43eb-b38f-c98bc3a37fe8", // Carbone Educação
-  "89a0befe-b005-4fd8-9359-bc452d105f04": "4c42881c-1e6e-46b8-b78b-ac05879b1230", // Carbone Club
-  "f37e7cc9-34d5-4c10-b86e-a9db4f165d5f": "41884ddb-0ec4-47f1-984d-aeccbb53181c", // Onevo Investimentos
-  "744cc953-db85-4730-b7dc-cb243dbad256": "2a4c14d0-485c-4260-9790-6351fa2d07f5", // Onevo Energia
-  "43f458e4-737b-423b-ad4b-da88a0d4d701": "45d0c87a-243f-4134-8069-a2074105f080", // Weevo
-  "9020a82f-4844-4abf-8ae2-cba8c2b72047": "2ea412cf-9b46-418e-979d-0d32630e943c", // Box Corporativo
-  "8382554f-f71f-4256-befc-6920562a3086": null, // Quatro5 (holding)
-  "77f13a56-39bc-4501-9611-8862c861b36d": null, // Time SB
-  "f51d9659-91c3-4ec6-965b-0f6ce58ab642": null, // Time Onevo
-};
-
 // Cor do evento no Google Calendar por marca (colorId da API)
 export const GCAL_COLOR_BY_MARCA: Partial<Record<Marca, string>> = {
   Onevo: "9",

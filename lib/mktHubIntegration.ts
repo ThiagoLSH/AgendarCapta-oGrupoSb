@@ -5,14 +5,9 @@
 import crypto from "crypto";
 import { NextRequest } from "next/server";
 import { ClickUpTask, getCustomFieldValue } from "./clickup";
-import {
-  CUSTOM_FIELDS,
-  FIXED_FIELD_VALUES,
-  SUBMARCA_UUID_TO_MKT_HUB_COMPANY_ID,
-  SUBMARCAS_BY_MARCA,
-} from "./config";
+import { CUSTOM_FIELDS, FIXED_FIELD_VALUES, GOOGLE_CALENDAR, periodoFromHour, SUBMARCAS_BY_MARCA } from "./config";
 import { resolveEventWindow } from "./eventWindow";
-import { toFortalezaIso } from "./timezone";
+import { toFortalezaIso, toFortalezaParts } from "./timezone";
 
 const UUID_TO_LABEL: Record<string, string> = Object.fromEntries(
   Object.values(SUBMARCAS_BY_MARCA).flatMap((options) => options.map((opt) => [opt.uuid, opt.label] as const))
@@ -40,27 +35,15 @@ export function isAuthorizedMktHubRequest(req: NextRequest): boolean {
 }
 
 /**
- * Normaliza o `type` nativo do status do ClickUp (open/unstarted/custom/done/closed) num
- * enum de negócio estável. NÃO existe hoje nenhum status de cancelamento na lista "House
- * Quatro5" — se um dia criarem um (ex: "cancelado"), o ClickUp provavelmente vai atribuir
- * `type: "closed"` a ele também (mesmo type do fluxo de conclusão normal), o que geraria
- * ambiguidade com tasks realmente concluídas. Se isso acontecer, esse mapeamento precisa
- * ser revisitado (provavelmente distinguindo pelo nome do status também, não só pelo type).
+ * Estado de negócio exposto pro MKT Hub — reconstruído combinando duas fontes:
+ *  - "agendado": a task ainda existe no ClickUp (não importa o status cru dela lá dentro
+ *    — não temos permissão pra criar um status novo tipo "cancelado" na lista House
+ *    Quatro5, então TODA task viva é "agendado" do ponto de vista do MKT Hub).
+ *  - "cancelado": a task foi excluída de verdade pelo painel Master. Como o ClickUp não
+ *    guarda mais nada sobre ela, isso vem de uma lista à parte no Vercel Edge Config
+ *    (ver lib/mktHubTombstones.ts), com retenção rolante de 60 dias.
  */
-export type EstadoCaptacao = "em_andamento" | "concluido";
-
-export function normalizeEstado(statusType: string | undefined): EstadoCaptacao {
-  switch (statusType) {
-    case "done":
-    case "closed":
-      return "concluido";
-    case "open":
-    case "unstarted":
-    case "custom":
-    default:
-      return "em_andamento";
-  }
-}
+export type EstadoCaptacao = "agendado" | "cancelado";
 
 /** Extrai `Local: <valor>` da primeira linha correspondente da descrição, ou null. */
 export function parseLocalFromDescription(description: string | undefined): string | null {
@@ -76,8 +59,12 @@ const PHONE_LIKE_RE = /\+?\d[\d\s()\-]{7,}\d/g;
 const WHATSAPP_SOLICITANTE_LINE_RE = /^.*WhatsApp do solicitante:.*$/gim;
 
 /**
- * Extrai o texto entre a linha "Briefing:" e a próxima linha em branco seguida de
- * "Roteiro:" (ou o fim da descrição). Depois remove qualquer linha de WhatsApp do
+ * Extrai o texto entre a linha "Briefing:" e o que vier primeiro entre: a próxima linha
+ * em branco seguida de "Roteiro:", ou o marcador de sincronização do Google Calendar
+ * (`GOOGLE_CALENDAR.syncedMarkerPrefix`, gravado por `syncSingleTask` em lib/sync.ts,
+ * anexado ao FINAL da descrição depois da task já existir — sem essa segunda checagem,
+ * uma captação sem roteiro pronto vazava "Sincronizado no Google Agenda (event: ...)"
+ * dentro do briefing exposto pro MKT Hub). Depois remove qualquer linha de WhatsApp do
  * solicitante e redige sequências que pareçam telefone, como rede de segurança extra —
  * esse campo nunca deve vazar telefone pro MKT Hub.
  */
@@ -88,10 +75,15 @@ export function parseBriefingFromDescription(description: string | undefined): s
   if (briefingIdx === -1) return "";
 
   let rest = description.slice(briefingIdx + "Briefing:".length);
-  // Corta no primeiro "\n\nRoteiro:" (linha em branco seguida de Roteiro:), se existir.
+
   const roteiroMatch = /\n\s*\n\s*Roteiro:/.exec(rest);
-  if (roteiroMatch) {
-    rest = rest.slice(0, roteiroMatch.index);
+  const syncMarkerIdx = rest.indexOf(GOOGLE_CALENDAR.syncedMarkerPrefix);
+
+  const cutCandidates = [roteiroMatch?.index, syncMarkerIdx === -1 ? undefined : syncMarkerIdx].filter(
+    (i): i is number => i !== undefined
+  );
+  if (cutCandidates.length > 0) {
+    rest = rest.slice(0, Math.min(...cutCandidates));
   }
 
   let briefing = rest.replace(/^\n+/, "").replace(/\n+$/, "");
@@ -106,14 +98,40 @@ export function parseBriefingFromDescription(description: string | undefined): s
   return briefing;
 }
 
-export interface MktHubCaptacao {
+/**
+ * Objeto de empresa/marca cru — exatamente como está no custom field "Empresa" do
+ * ClickUp, sem NENHUMA tradução pro lado do MKT Hub (não existe mapeamento de
+ * companyId de terceiro; isso já existiu numa versão anterior dessa integração e foi
+ * removido a pedido explícito — o MKT Hub trata a tradução do lado dele).
+ */
+export interface EmpresaOrigem {
+  option_id: string;
+  label: string;
+}
+
+export interface MktHubCaptacaoAgendada {
   id: string;
-  estado: EstadoCaptacao;
-  estado_bruto_clickup: string;
+  estado: "agendado";
+  /** Status cru do ClickUp (ex: "pendente ", com o espaço — não normalizamos). */
+  status_origem: string;
   inicio: string;
-  fim: string;
+  /**
+   * `resolveEventWindow` (lib/eventWindow.ts), no estado atual do código, SEMPRE resolve
+   * start+end juntos (devolve os dois, ou `null` pro par inteiro quando a task não tem
+   * nem start_date nem due_date) — não existe hoje nenhum caminho real de "início
+   * resolvido, fim não resolvido" dentro dessa função. Ainda assim o tipo aqui é
+   * `string | null` (em vez de sempre `string`) pra já suportar corretamente esse cenário
+   * se `resolveEventWindow` um dia passar a devolver os dois de forma independente, sem
+   * quebrar contrato com o MKT Hub. Hoje, na prática, toda captação com `estado:
+   * "agendado"` tem `fim` preenchido — se aparecer `null`, é porque a lógica de
+   * `resolveEventWindow` mudou e precisa ser revisitada aqui também.
+   */
+  fim: string | null;
+  /** Data da captação (AAAA-MM-DD), em America/Fortaleza, derivada de `inicio`. */
+  data: string;
+  turno: import("./config").Periodo;
   local: string | null;
-  marca: { valor_clickup: string | null; slug_mkt_hub: string | null };
+  empresa_origem: EmpresaOrigem | null;
   quem_grava: { nome: string; clickup_user_id: number; email: string | null }[];
   // Não existe hoje nenhum jeito de recuperar foto/vídeo/ambos a partir da task de
   // captação já criada — o form só usa esse dado internamente pra decidir quais tasks de
@@ -128,19 +146,45 @@ export interface MktHubCaptacao {
 }
 
 /**
+ * Objeto mínimo devolvido pra uma captação cancelada (excluída de verdade no ClickUp,
+ * cuja exclusão foi registrada em lib/mktHubTombstones.ts). A task não existe mais no
+ * ClickUp, então não há de onde recuperar local/briefing/empresa/etc — todos `null`.
+ */
+export interface MktHubCaptacaoCancelada {
+  id: string;
+  estado: "cancelado";
+  status_origem: "deletado";
+  atualizado_em: string;
+  inicio: null;
+  fim: null;
+  data: null;
+  turno: null;
+  local: null;
+  empresa_origem: null;
+  quem_grava: null;
+  tipo_captacao: null;
+  titulo: null;
+  briefing: null;
+  criado_em: null;
+}
+
+export type MktHubCaptacao = MktHubCaptacaoAgendada | MktHubCaptacaoCancelada;
+
+/**
  * Converte uma ClickUpTask (já filtrada como Captação) pro formato exposto pelo MKT Hub.
  * Retorna `null` quando a janela de evento não é resolvível (nem start/due_date, nem
  * due_date sozinho) — situação rara/inesperada numa task de captação real, tratada como
  * "não expõe" em vez de inventar horário.
  */
-export function mapTaskToMktHubCaptacao(task: ClickUpTask): MktHubCaptacao | null {
+export function mapTaskToMktHubCaptacao(task: ClickUpTask): MktHubCaptacaoAgendada | null {
   const window = resolveEventWindow(task);
   if (!window) return null;
 
   const empresaValue = getCustomFieldValue(task, CUSTOM_FIELDS.empresa);
   const empresaUuid = Array.isArray(empresaValue) ? (empresaValue[0] as string | undefined) ?? null : null;
-  const valorClickup = empresaUuid ? UUID_TO_LABEL[empresaUuid] ?? null : null;
-  const slugMktHub = empresaUuid ? SUBMARCA_UUID_TO_MKT_HUB_COMPANY_ID[empresaUuid] ?? null : null;
+  const empresaLabel = empresaUuid ? UUID_TO_LABEL[empresaUuid] ?? null : null;
+  const empresaOrigem: EmpresaOrigem | null =
+    empresaUuid && empresaLabel ? { option_id: empresaUuid, label: empresaLabel } : null;
 
   const quemGrava = (task.assignees ?? []).map((a) => ({
     nome: a.username,
@@ -148,20 +192,51 @@ export function mapTaskToMktHubCaptacao(task: ClickUpTask): MktHubCaptacao | nul
     email: a.email ?? null,
   }));
 
+  const inicioParts = toFortalezaParts(window.start);
+  const data = `${inicioParts.year}-${String(inicioParts.month + 1).padStart(2, "0")}-${String(
+    inicioParts.day
+  ).padStart(2, "0")}`;
+
   return {
     id: task.id,
-    estado: normalizeEstado(task.status.type),
-    estado_bruto_clickup: task.status.status,
+    estado: "agendado",
+    status_origem: task.status.status,
     inicio: toFortalezaIso(window.start),
     fim: toFortalezaIso(window.end),
+    data,
+    turno: periodoFromHour(inicioParts.hour),
     local: parseLocalFromDescription(task.description),
-    marca: { valor_clickup: valorClickup, slug_mkt_hub: slugMktHub },
+    empresa_origem: empresaOrigem,
     quem_grava: quemGrava,
     tipo_captacao: null,
     titulo: task.name,
     briefing: parseBriefingFromDescription(task.description),
     criado_em: toFortalezaIso(new Date(Number(task.date_created))),
     atualizado_em: toFortalezaIso(new Date(Number(task.date_updated))),
+  };
+}
+
+/** Converte uma entrada de cancelamento (lib/mktHubTombstones.ts) pro formato MKT Hub. */
+export function mapCancelamentoToMktHubCaptacao(entry: {
+  taskId: string;
+  canceladoEm: string;
+}): MktHubCaptacaoCancelada {
+  return {
+    id: entry.taskId,
+    estado: "cancelado",
+    status_origem: "deletado",
+    atualizado_em: entry.canceladoEm,
+    inicio: null,
+    fim: null,
+    data: null,
+    turno: null,
+    local: null,
+    empresa_origem: null,
+    quem_grava: null,
+    tipo_captacao: null,
+    titulo: null,
+    briefing: null,
+    criado_em: null,
   };
 }
 

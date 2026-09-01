@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTask } from "@/lib/clickup";
-import { isAuthorizedMktHubRequest, isCaptacaoTask, mapTaskToMktHubCaptacao } from "@/lib/mktHubIntegration";
+import {
+  isAuthorizedMktHubRequest,
+  isCaptacaoTask,
+  mapCancelamentoToMktHubCaptacao,
+  mapTaskToMktHubCaptacao,
+} from "@/lib/mktHubIntegration";
+import { getCancelamentos } from "@/lib/mktHubTombstones";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -17,6 +23,15 @@ function notFound() {
     { error: "not_found", message: "Captação não encontrada." },
     { status: 404 }
   );
+}
+
+/** Verifica se `id` está na lista de cancelamentos (Edge Config); devolve o objeto mínimo
+ * de cancelamento se sim, ou `null` se não (nem sequer lá — pode ter sido podado após 60
+ * dias, o que é esperado, não é bug). */
+async function findCancelamentoResponse(id: string) {
+  const cancelamentos = await getCancelamentos();
+  const entry = cancelamentos.find((c) => c.taskId === id);
+  return entry ? mapCancelamentoToMktHubCaptacao(entry) : null;
 }
 
 /**
@@ -63,6 +78,13 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     // isso a checagem abaixo exige o ECODE específico, não só o status 401.
     const message = err instanceof Error ? err.message : String(err);
     if (message.includes("404") || message.includes("OAUTH_023") || message.includes("OAUTH_027")) {
+      // Antes de assumir 404 de verdade: a task pode não existir mais no ClickUp
+      // justamente porque foi cancelada (excluída) pelo painel Master — nesse caso ela
+      // ainda "existe" do ponto de vista do MKT Hub, só que com estado "cancelado".
+      const cancelamento = await findCancelamentoResponse(params.id);
+      if (cancelamento) {
+        return NextResponse.json(cancelamento);
+      }
       return notFound();
     }
     return NextResponse.json({ error: message }, { status: 500 });
