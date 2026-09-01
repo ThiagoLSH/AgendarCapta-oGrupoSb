@@ -43,3 +43,17 @@ export function withFortalezaTime(date: Date, hour: number, minute: number): Dat
   const parts = toFortalezaParts(date);
   return fortalezaToUtc(parts.year, parts.month + 1, parts.day, hour, minute);
 }
+
+/**
+ * Formata um instante absoluto como ISO-8601 com o offset explícito de Fortaleza
+ * (-03:00), nunca "Z" nem sem offset — usado nas respostas da integração externa
+ * (MKT Hub) pra evitar qualquer ambiguidade de fuso no consumidor.
+ */
+export function toFortalezaIso(date: Date): string {
+  const shifted = new Date(date.getTime() - FORTALEZA_UTC_OFFSET_MS);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${shifted.getUTCFullYear()}-${pad(shifted.getUTCMonth() + 1)}-${pad(shifted.getUTCDate())}` +
+    `T${pad(shifted.getUTCHours())}:${pad(shifted.getUTCMinutes())}:${pad(shifted.getUTCSeconds())}-03:00`
+  );
+}

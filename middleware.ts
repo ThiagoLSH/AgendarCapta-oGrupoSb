@@ -44,6 +44,11 @@ export async function middleware(req: NextRequest) {
   return NextResponse.redirect(loginUrl);
 }
 
+// O matcher abaixo é uma allowlist: qualquer path fora dela nunca passa por esse
+// middleware. É assim que /api/sync (autenticado por CRON_SECRET bearer) já ficava fora
+// do gate de cookie, e é o mesmo padrão usado por /api/integrations/mkt-hub/* (autenticado
+// por MKT_HUB_API_TOKEN bearer, ver lib/mktHubIntegration.ts) — não precisa (nem deve)
+// entrar nessa lista.
 export const config = {
   matcher: ["/calendario", "/api/tasks", "/admin", "/api/admin/:path*"],
 };

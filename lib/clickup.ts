@@ -37,6 +37,12 @@ export interface ClickUpCustomFieldValue {
   value: unknown;
 }
 
+export interface ClickUpAssignee {
+  id: number;
+  username: string;
+  email: string | null;
+}
+
 export interface ClickUpTask {
   id: string;
   name: string;
@@ -47,8 +53,12 @@ export interface ClickUpTask {
   start_date: string | null;
   due_date: string | null;
   url: string;
-  status: { status: string };
+  // `type` é o campo nativo do ClickUp que categoriza o status (open/unstarted/custom/
+  // done/closed), independente do texto exibido — é o único jeito confiável de agrupar
+  // status em "estados" de negócio sem depender de nomes que podem mudar/ter acento.
+  status: { status: string; type?: string };
   custom_fields: ClickUpCustomFieldValue[];
+  assignees?: ClickUpAssignee[];
 }
 
 export interface CreateCaptacaoInput {
@@ -149,6 +159,52 @@ export async function listCaptacaoTasks(options: ListCaptacaoTasksOptions = {}):
   }
 
   return allTasks;
+}
+
+export interface ListCaptacaoTasksPageOptions {
+  /** epoch ms — filtra por date_updated > (nativo do ClickUp, confirmado por teste empírico). */
+  dateUpdatedGreaterThan?: number;
+  /** índice de página do ClickUp (0-based). Cada página tem até 100 tasks — a API não
+   * aceita tamanho de página customizado. */
+  page?: number;
+}
+
+export interface ListCaptacaoTasksPageResult {
+  tasks: ClickUpTask[];
+  /** valor cru de `last_page` retornado pela API do ClickUp para essa página. */
+  lastPage: boolean;
+}
+
+/**
+ * Variante de `listCaptacaoTasks` que devolve UMA página de até 100 tasks por vez, em vez
+ * de auto-paginar tudo internamente — usada pelo endpoint de integração
+ * (/api/integrations/mkt-hub/captacoes), que precisa expor paginação própria pro
+ * consumidor externo. Não reaproveita `listCaptacaoTasks()` de propósito, pra não alterar
+ * o comportamento (nem a assinatura) das chamadas existentes em app/api/tasks e
+ * app/api/captacoes (via lib/conflict.ts).
+ */
+export async function listCaptacaoTasksPage(
+  options: ListCaptacaoTasksPageOptions = {}
+): Promise<ListCaptacaoTasksPageResult> {
+  const params = new URLSearchParams();
+  params.set("include_closed", "true");
+  params.set("subtasks", "true");
+  params.set(
+    "custom_fields",
+    JSON.stringify([
+      { field_id: CUSTOM_FIELDS.tarefasSkill, operator: "ANY", value: [FIXED_FIELD_VALUES.tarefasSkillCaptacao] },
+    ])
+  );
+  if (options.dateUpdatedGreaterThan) {
+    params.set("date_updated_gt", String(options.dateUpdatedGreaterThan));
+  }
+  params.set("page", String(options.page ?? 0));
+
+  const data = await clickupFetch<{ tasks: ClickUpTask[]; last_page: boolean }>(
+    `/list/${CLICKUP.listId}/task?${params.toString()}`
+  );
+
+  return { tasks: data.tasks, lastPage: data.last_page };
 }
 
 /** Atualiza a descrição de uma task (usado para gravar o marcador de sincronização). */
