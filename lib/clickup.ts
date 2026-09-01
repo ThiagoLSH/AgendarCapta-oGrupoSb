@@ -123,6 +123,14 @@ export interface ListCaptacaoTasksOptions {
   dueDateGreaterThan?: number;
   /** epoch ms — filtra por due_date <= */
   dueDateLessThan?: number;
+  /**
+   * epoch ms — filtra por date_updated > (nativo do ClickUp, `date_updated_gt`,
+   * confirmado por teste empírico). Opcional, usado hoje só pelo endpoint de integração
+   * MKT Hub (/api/integrations/mkt-hub/captacoes) pra puxar o conjunto completo filtrado
+   * por `updated_since` antes de paginar. Não afeta quem já chama `listCaptacaoTasks()`
+   * sem passar esse campo.
+   */
+  dateUpdatedGreaterThan?: number;
 }
 
 /**
@@ -144,6 +152,7 @@ export async function listCaptacaoTasks(options: ListCaptacaoTasksOptions = {}):
   );
   if (options.dueDateGreaterThan) params.set("due_date_gt", String(options.dueDateGreaterThan));
   if (options.dueDateLessThan) params.set("due_date_lt", String(options.dueDateLessThan));
+  if (options.dateUpdatedGreaterThan) params.set("date_updated_gt", String(options.dateUpdatedGreaterThan));
 
   const allTasks: ClickUpTask[] = [];
   let page = 0;
@@ -159,52 +168,6 @@ export async function listCaptacaoTasks(options: ListCaptacaoTasksOptions = {}):
   }
 
   return allTasks;
-}
-
-export interface ListCaptacaoTasksPageOptions {
-  /** epoch ms — filtra por date_updated > (nativo do ClickUp, confirmado por teste empírico). */
-  dateUpdatedGreaterThan?: number;
-  /** índice de página do ClickUp (0-based). Cada página tem até 100 tasks — a API não
-   * aceita tamanho de página customizado. */
-  page?: number;
-}
-
-export interface ListCaptacaoTasksPageResult {
-  tasks: ClickUpTask[];
-  /** valor cru de `last_page` retornado pela API do ClickUp para essa página. */
-  lastPage: boolean;
-}
-
-/**
- * Variante de `listCaptacaoTasks` que devolve UMA página de até 100 tasks por vez, em vez
- * de auto-paginar tudo internamente — usada pelo endpoint de integração
- * (/api/integrations/mkt-hub/captacoes), que precisa expor paginação própria pro
- * consumidor externo. Não reaproveita `listCaptacaoTasks()` de propósito, pra não alterar
- * o comportamento (nem a assinatura) das chamadas existentes em app/api/tasks e
- * app/api/captacoes (via lib/conflict.ts).
- */
-export async function listCaptacaoTasksPage(
-  options: ListCaptacaoTasksPageOptions = {}
-): Promise<ListCaptacaoTasksPageResult> {
-  const params = new URLSearchParams();
-  params.set("include_closed", "true");
-  params.set("subtasks", "true");
-  params.set(
-    "custom_fields",
-    JSON.stringify([
-      { field_id: CUSTOM_FIELDS.tarefasSkill, operator: "ANY", value: [FIXED_FIELD_VALUES.tarefasSkillCaptacao] },
-    ])
-  );
-  if (options.dateUpdatedGreaterThan) {
-    params.set("date_updated_gt", String(options.dateUpdatedGreaterThan));
-  }
-  params.set("page", String(options.page ?? 0));
-
-  const data = await clickupFetch<{ tasks: ClickUpTask[]; last_page: boolean }>(
-    `/list/${CLICKUP.listId}/task?${params.toString()}`
-  );
-
-  return { tasks: data.tasks, lastPage: data.last_page };
 }
 
 /** Atualiza a descrição de uma task (usado para gravar o marcador de sincronização). */
